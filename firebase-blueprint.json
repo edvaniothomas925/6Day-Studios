@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Perfil do usuário no sistema.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "client"] }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Um projeto no portfólio da produtora.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["video", "audio"] },
+        "thumbnail": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["title", "category", "type", "thumbnail", "description"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Um serviço ou plano oferecido pela produtora.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["video", "audio"] },
+        "description": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "features": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["title", "category", "type", "description", "basePrice", "features"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Configurações globais da produtora (contato, redes sociais, etc).",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "mapEmbedUrl": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "instagram": { "type": "string" },
+        "youtube": { "type": "string" },
+        "facebook": { "type": "string" },
+        "tiktok": { "type": "string" }
+      },
+      "required": ["whatsapp", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfis de usuários"
+    },
+    "/projects": {
+      "schema": "Project",
+      "description": "Projetos do portfólio"
+    },
+    "/services": {
+      "schema": "Service",
+      "description": "Serviços e planos oferecidos"
+    },
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Configurações globais (geralmente apenas um documento 'main')"
+    }
+  }
+}
