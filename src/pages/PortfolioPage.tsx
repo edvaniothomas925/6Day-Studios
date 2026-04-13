@@ -139,14 +139,31 @@ const PortfolioPage = () => {
                 className="group relative aspect-video overflow-hidden rounded-2xl cursor-pointer"
                 onClick={() => setSelectedProject(project)}
               >
-                <OptimizedImage 
-                  src={project.thumbnail} 
-                  alt={project.title}
-                  loading="lazy"
-                  containerClassName="w-full h-full"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="w-full h-full relative">
+                  {project.thumbnail ? (
+                    <OptimizedImage 
+                      src={project.thumbnail} 
+                      alt={project.title}
+                      loading="lazy"
+                      containerClassName="w-full h-full"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-premium-gray to-black flex flex-col items-center justify-center p-8 transition-transform duration-700 group-hover:scale-110">
+                      <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mb-4 group-hover:bg-gold/20 transition-colors">
+                        {project.type === 'video' ? (
+                          <Video className="w-8 h-8 text-gold" />
+                        ) : (
+                          <Music className="w-8 h-8 text-gold" />
+                        )}
+                      </div>
+                      <span className="text-white/20 text-[10px] font-black uppercase tracking-[0.3em] text-center">
+                        {project.type === 'video' ? 'Produção Visual' : 'Produção Sonora'}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-8">
                   <div className="flex items-center gap-2 mb-2">
                     {project.type === 'video' ? <Video className="w-4 h-4 text-gold" /> : <Music className="w-4 h-4 text-gold" />}

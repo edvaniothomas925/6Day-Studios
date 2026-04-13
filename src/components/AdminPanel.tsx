@@ -182,7 +182,13 @@ const AdminPanel = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
                 {projects.map(project => (
                   <div key={project.id} className="bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 group">
-                    <img src={project.thumbnail} className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0" alt="" referrerPolicy="no-referrer" />
+                    {project.thumbnail ? (
+                      <img src={project.thumbnail} className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0" alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-16 h-16 md:w-20 md:h-20 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center flex-shrink-0 text-gold/40">
+                        {project.type === 'video' ? <Video className="w-6 h-6" /> : <Music className="w-6 h-6" />}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold truncate text-sm md:text-base">{project.title}</h4>
                       <p className="text-[10px] md:text-xs text-white/40 uppercase tracking-widest truncate">{project.type} • {project.category}</p>
