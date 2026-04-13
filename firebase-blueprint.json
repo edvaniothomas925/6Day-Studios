@@ -26,7 +26,7 @@
         "audioUrl": { "type": "string" },
         "description": { "type": "string" }
       },
-      "required": ["title", "category", "type", "thumbnail", "description"]
+      "required": ["title", "category", "type", "description"]
     },
     "Service": {
       "title": "Service",

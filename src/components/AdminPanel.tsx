@@ -522,7 +522,6 @@ const AdminPanel = () => {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-white/40">Thumbnail (Capa)</label>
                     <input 
-                      required
                       type="text" 
                       value={editingProject.thumbnail || ''}
                       onChange={e => setEditingProject({...editingProject, thumbnail: getDirectLink(e.target.value)})}
