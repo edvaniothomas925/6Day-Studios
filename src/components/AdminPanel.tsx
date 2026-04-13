@@ -172,7 +172,7 @@ const AdminPanel = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="text-xl md:text-2xl font-bold">Gerenciar Projetos</h3>
                 <button 
-                  onClick={() => setEditingProject({ type: 'video', category: 'Comercial', features: [] } as any)}
+                  onClick={() => setEditingProject({ type: 'video', category: 'Comercial' } as any)}
                   className="w-full sm:w-auto px-4 py-2.5 bg-gold text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" /> Novo Projeto
@@ -212,7 +212,7 @@ const AdminPanel = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="text-xl md:text-2xl font-bold">Gerenciar Serviços</h3>
                 <button 
-                  onClick={() => setEditingService({ features: [], category: 'Vídeo' })}
+                  onClick={() => setEditingService({ features: [], category: 'Vídeo', type: 'video', basePrice: 0 } as any)}
                   className="w-full sm:w-auto px-4 py-2.5 bg-gold text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" /> Novo Serviço
@@ -522,6 +522,7 @@ const AdminPanel = () => {
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-white/40">Thumbnail (Capa)</label>
                     <input 
+                      required
                       type="text" 
                       value={editingProject.thumbnail || ''}
                       onChange={e => setEditingProject({...editingProject, thumbnail: getDirectLink(e.target.value)})}
