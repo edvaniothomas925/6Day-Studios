@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Plus, Trash2, Edit2, Save, Settings as SettingsIcon, Globe, Mail, Phone, MapPin as MapPinIcon, Headphones, ExternalLink, Layout, Edit, Music, Video, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { cn, getDirectLink } from '../lib/utils';
+import { cn, getDirectLink, getYoutubeThumbnail, getYoutubeThumbnailFallback, isValidMediaUrl } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Project, Service, Settings } from '../types';
 import { useApp } from '../context/AppContext';
@@ -12,18 +12,42 @@ const AdminPanel = () => {
   const { projects, services, settings, setIsAdminOpen } = useApp();
   const [activeTab, setActiveTab] = useState<'portfolio' | 'services' | 'settings'>('portfolio');
 
+  // Pagination states
+  const [portfolioPage, setPortfolioPage] = useState(1);
+  const [servicesPage, setServicesPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   // Form states
   const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [editingSettings, setEditingSettings] = useState<Settings>(settings);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'project' | 'service', title: string } | null>(null);
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProject) return;
 
+    // Validation
+    const mediaUrl = editingProject.type === 'video' ? editingProject.videoUrl : editingProject.audioUrl;
+    if (mediaUrl && !isValidMediaUrl(mediaUrl)) {
+      toast.error(`A URL do ${editingProject.type === 'video' ? 'vídeo' : 'áudio'} não é válida ou não é suportada.`);
+      return;
+    }
+
+    // Auto-fill thumbnail for YouTube if empty
+    let finalProject = { ...editingProject };
+    const targetUrl = finalProject.type === 'video' ? finalProject.videoUrl : finalProject.audioUrl;
+    
+    if (targetUrl && !finalProject.thumbnail) {
+      const ytThumb = getYoutubeThumbnail(targetUrl);
+      if (ytThumb) {
+        finalProject.thumbnail = ytThumb;
+      }
+    }
+
     try {
-      if (editingProject.id) {
-        const { id, ...data } = editingProject;
+      if (finalProject.id) {
+        const { id, ...data } = finalProject;
         await updateDoc(doc(db, 'projects', id), {
           ...data,
           type: data.type || 'video'
@@ -31,8 +55,8 @@ const AdminPanel = () => {
         toast.success('Projeto atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'projects'), {
-          ...editingProject,
-          type: editingProject.type || 'video'
+          ...finalProject,
+          type: finalProject.type || 'video'
         });
         toast.success('Novo projeto adicionado!');
       }
@@ -44,13 +68,27 @@ const AdminPanel = () => {
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
+    const project = projects.find(p => p.id === id);
+    if (project) {
+      setItemToDelete({ id, type: 'project', title: project.title });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+
     try {
-      await deleteDoc(doc(db, 'projects', id));
-      toast.success('Projeto excluído com sucesso.');
+      if (itemToDelete.type === 'project') {
+        await deleteDoc(doc(db, 'projects', itemToDelete.id));
+        toast.success('Projeto excluído com sucesso.');
+      } else {
+        await deleteDoc(doc(db, 'services', itemToDelete.id));
+        toast.success('Serviço excluído.');
+      }
+      setItemToDelete(null);
     } catch (error) {
-      toast.error('Erro ao excluir projeto.');
-      handleFirestoreError(error, OperationType.DELETE, 'projects');
+      toast.error(`Erro ao excluir ${itemToDelete.type === 'project' ? 'projeto' : 'serviço'}.`);
+      handleFirestoreError(error, OperationType.DELETE, itemToDelete.type === 'project' ? 'projects' : 'services');
     }
   };
 
@@ -81,13 +119,9 @@ const AdminPanel = () => {
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este serviço?')) return;
-    try {
-      await deleteDoc(doc(db, 'services', id));
-      toast.success('Serviço excluído.');
-    } catch (error) {
-      toast.error('Erro ao excluir serviço.');
-      handleFirestoreError(error, OperationType.DELETE, 'services');
+    const service = services.find(s => s.id === id);
+    if (service) {
+      setItemToDelete({ id, type: 'service', title: service.title });
     }
   };
 
@@ -108,6 +142,19 @@ const AdminPanel = () => {
   };
 
   const appUrl = window.location.origin;
+
+  // Pagination calculations
+  const totalPortfolioPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
+  const paginatedProjects = projects.slice(
+    (portfolioPage - 1) * ITEMS_PER_PAGE,
+    portfolioPage * ITEMS_PER_PAGE
+  );
+
+  const totalServicesPages = Math.ceil(services.length / ITEMS_PER_PAGE);
+  const paginatedServices = services.slice(
+    (servicesPage - 1) * ITEMS_PER_PAGE,
+    servicesPage * ITEMS_PER_PAGE
+  );
 
   return (
     <motion.div 
@@ -180,10 +227,15 @@ const AdminPanel = () => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-                {projects.map(project => (
+                {paginatedProjects.map(project => (
                   <div key={project.id} className="bg-white/5 border border-white/10 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 group">
-                    {project.thumbnail ? (
-                      <img src={project.thumbnail} className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0" alt="" referrerPolicy="no-referrer" />
+                    {project.thumbnail || (project.type === 'video' && getYoutubeThumbnailFallback(project.videoUrl || '')) ? (
+                      <img 
+                        src={project.thumbnail || getYoutubeThumbnailFallback(project.videoUrl || '')} 
+                        className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg flex-shrink-0" 
+                        alt="" 
+                        referrerPolicy="no-referrer" 
+                      />
                     ) : (
                       <div className="w-16 h-16 md:w-20 md:h-20 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center flex-shrink-0 text-gold/40">
                         {project.type === 'video' ? <Video className="w-6 h-6" /> : <Music className="w-6 h-6" />}
@@ -210,6 +262,29 @@ const AdminPanel = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Portfolio Pagination Controls */}
+              {totalPortfolioPages > 1 && (
+                <div className="flex items-center justify-center gap-4 pt-4">
+                  <button
+                    disabled={portfolioPage === 1}
+                    onClick={() => setPortfolioPage(prev => Math.max(1, prev - 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                    Página {portfolioPage} de {totalPortfolioPages}
+                  </span>
+                  <button
+                    disabled={portfolioPage === totalPortfolioPages}
+                    onClick={() => setPortfolioPage(prev => Math.min(totalPortfolioPages, prev + 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -226,7 +301,7 @@ const AdminPanel = () => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {services.map(service => (
+                {paginatedServices.map(service => (
                   <div key={service.id} className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 group">
                     <div className="flex items-start justify-between mb-4 gap-4">
                       <div className="min-w-0">
@@ -253,6 +328,29 @@ const AdminPanel = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Services Pagination Controls */}
+              {totalServicesPages > 1 && (
+                <div className="flex items-center justify-center gap-4 pt-4">
+                  <button
+                    disabled={servicesPage === 1}
+                    onClick={() => setServicesPage(prev => Math.max(1, prev - 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                    Página {servicesPage} de {totalServicesPages}
+                  </span>
+                  <button
+                    disabled={servicesPage === totalServicesPages}
+                    onClick={() => setServicesPage(prev => Math.min(totalServicesPages, prev + 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -538,7 +636,7 @@ const AdminPanel = () => {
 
                   {editingProject.type === 'video' ? (
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">URL do Vídeo (YouTube ou Link Direto)</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">URL do Vídeo (YouTube, Google Drive ou Link Direto)</label>
                       <input 
                         required
                         type="text" 
@@ -550,14 +648,14 @@ const AdminPanel = () => {
                     </div>
                   ) : (
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">Arquivo de Áudio (URL Direta)</label>
+                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">Arquivo de Áudio ou Link (YouTube, SoundCloud, Google Drive)</label>
                       <input 
                         required
                         type="text" 
                         value={editingProject.audioUrl || ''}
                         onChange={e => setEditingProject({...editingProject, audioUrl: getDirectLink(e.target.value)})}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-sm"
-                        placeholder="URL do arquivo .mp3 (Google Drive, etc)"
+                        placeholder="Link do YouTube, SoundCloud ou URL do arquivo .mp3"
                       />
                     </div>
                   )}
@@ -699,6 +797,46 @@ const AdminPanel = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {itemToDelete && (
+          <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-premium-gray border border-white/10 rounded-2xl w-full max-w-md p-6 md:p-8"
+            >
+              <div className="flex items-center gap-4 mb-6 text-red-500">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold">Confirmar Exclusão</h3>
+              </div>
+              
+              <p className="text-white/60 mb-8 leading-relaxed">
+                Tem certeza que deseja excluir <span className="text-white font-bold">"{itemToDelete.title}"</span>? Esta ação não pode ser desfeita.
+              </p>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setItemToDelete(null)}
+                  className="flex-1 py-3 bg-white/5 rounded-xl font-bold hover:bg-white/10 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -11,7 +11,7 @@ interface OptimizedImageProps {
   referrerPolicy?: React.HTMLAttributeReferrerPolicy;
 }
 
-export const OptimizedImage = ({ src, alt, className, containerClassName, ...props }: OptimizedImageProps) => {
+export const OptimizedImage = ({ src, alt, className, containerClassName, referrerPolicy = "no-referrer", ...props }: OptimizedImageProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   return (
@@ -21,6 +21,7 @@ export const OptimizedImage = ({ src, alt, className, containerClassName, ...pro
         src={src}
         alt={alt}
         onLoad={() => setIsLoaded(true)}
+        referrerPolicy={referrerPolicy}
         className={cn(
           "transition-opacity duration-700",
           isLoaded ? "opacity-100" : "opacity-0",

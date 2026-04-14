@@ -68,42 +68,45 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'displayName', 'role']) &&
-             data.uid is string && data.uid.size() > 0 &&
-             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
-             data.displayName is string && data.displayName.size() < 100 &&
-             data.role in ['admin', 'client'];
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
+             data.email is string && data.email.size() < 256 && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.role in ['admin', 'client'] &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 1000));
     }
 
     function isValidProject(data) {
       return data.keys().hasAll(['title', 'category', 'type', 'description']) &&
-             data.title is string && data.title.size() > 0 &&
-             data.category is string && data.category.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
              data.type in ['video', 'audio'] &&
-             data.description is string && data.description.size() > 0 &&
-             (!('thumbnail' in data) || (data.thumbnail is string));
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             (!('thumbnail' in data) || (data.thumbnail is string && data.thumbnail.size() < 1000)) &&
+             (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() < 1000)) &&
+             (!('audioUrl' in data) || (data.audioUrl is string && data.audioUrl.size() < 1000));
     }
 
     function isValidService(data) {
       return data.keys().hasAll(['title', 'category', 'type', 'description', 'basePrice', 'features']) &&
-             data.title is string && data.title.size() < 100 &&
-             data.category is string && data.category.size() < 50 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
              data.type in ['video', 'audio'] &&
-             data.description is string && data.description.size() < 1000 &&
-             data.basePrice is number && data.basePrice >= 0 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 1000 &&
+             data.basePrice is number && data.basePrice >= 0 && data.basePrice < 1000000000 &&
              data.features is list && data.features.size() < 20;
     }
 
     function isValidSettings(data) {
       return data.keys().hasAll(['whatsapp', 'email']) &&
-             data.whatsapp is string &&
-             data.email is string &&
-             (!('logoUrl' in data) || data.logoUrl is string) &&
-             (!('mapEmbedUrl' in data) || data.mapEmbedUrl is string) &&
-             (!('instagram' in data) || data.instagram is string) &&
-             (!('youtube' in data) || data.youtube is string) &&
-             (!('facebook' in data) || data.facebook is string) &&
-             (!('tiktok' in data) || data.tiktok is string) &&
-             (!('address' in data) || data.address is string);
+             data.whatsapp is string && data.whatsapp.size() < 20 &&
+             data.email is string && data.email.size() < 256 &&
+             (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() < 1000)) &&
+             (!('mapEmbedUrl' in data) || (data.mapEmbedUrl is string && data.mapEmbedUrl.size() < 2000)) &&
+             (!('instagram' in data) || (data.instagram is string && data.instagram.size() < 500)) &&
+             (!('youtube' in data) || (data.youtube is string && data.youtube.size() < 500)) &&
+             (!('facebook' in data) || (data.facebook is string && data.facebook.size() < 500)) &&
+             (!('tiktok' in data) || (data.tiktok is string && data.tiktok.size() < 500)) &&
+             (!('address' in data) || (data.address is string && data.address.size() < 500));
     }
 
     // ===============================================================

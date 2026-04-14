@@ -66,6 +66,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (snapshot.exists()) {
         setSettings({ ...DEFAULT_SETTINGS, ...snapshot.data() } as Settings);
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'settings/main');
     });
 
     // Projects Listener

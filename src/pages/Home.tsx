@@ -6,7 +6,11 @@ import { useApp } from '../context/AppContext';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const Home = () => {
-  const { settings } = useApp();
+  const { settings, projects } = useApp();
+
+  const featuredProjects = useMemo(() => {
+    return projects.slice(0, 4);
+  }, [projects]);
 
   const stats = useMemo(() => [
     { label: 'Projetos Entregues', value: '500+', icon: <Award className="w-5 h-5" /> },
@@ -180,10 +184,10 @@ const Home = () => {
             ].map((item, i) => (
               <motion.div 
                 key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                whileInView={{ opacity: 1, scale: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.2 }}
+                transition={{ delay: i * 0.2, duration: 0.8, ease: "easeOut" }}
                 className="glass-card p-10 group hover:border-gold/40 transition-all duration-500 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -200,6 +204,62 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* Featured Projects Section */}
+      {featuredProjects.length > 0 && (
+        <section className="py-32 px-6 relative z-10 bg-premium-black/50">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row items-end justify-between mb-20 gap-8">
+              <div className="max-w-xl">
+                <span className="text-gold text-[10px] font-black tracking-[0.3em] uppercase mb-4 block">Portfólio</span>
+                <h2 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 leading-none">Trabalhos em <br /><span className="text-gold">Destaque</span></h2>
+                <p className="text-white/40 text-lg font-light">Uma amostra da nossa excelência em cada frame e cada nota musical.</p>
+              </div>
+              <Link to="/portfolio" className="px-8 py-4 bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white/10 transition-all flex items-center gap-3">
+                Explorar Tudo <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {featuredProjects.map((project, i) => (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                  whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.8, ease: "easeOut" }}
+                  className="group relative aspect-video overflow-hidden rounded-2xl cursor-pointer"
+                >
+                  <Link to={`/portfolio?project=${project.id}`} className="block w-full h-full">
+                    <OptimizedImage 
+                      src={project.thumbnail || (project.type === 'video' ? `https://i.ytimg.com/vi/${project.videoUrl?.split('v=')[1]?.split('&')[0] || project.videoUrl?.split('youtu.be/')[1]?.split('?')[0]}/hqdefault.jpg` : '')} 
+                      alt={project.title}
+                      containerClassName="w-full h-full"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute bottom-0 left-0 p-8 w-full">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="px-3 py-1 bg-gold/20 border border-gold/30 rounded-full text-[10px] font-black text-gold uppercase tracking-widest">
+                          {project.category}
+                        </span>
+                        <span className="text-white/40 text-[10px] uppercase tracking-widest font-bold">
+                          {project.type === 'video' ? 'Vídeo' : 'Áudio'}
+                        </span>
+                      </div>
+                      <h3 className="text-2xl md:text-3xl font-bold text-white group-hover:text-gold transition-colors">{project.title}</h3>
+                    </div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-gold/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100">
+                      {project.type === 'video' ? <Play className="w-6 h-6 fill-black text-black" /> : <Music className="w-6 h-6 text-black" />}
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Process Section */}
       <section className="py-32 px-6 bg-premium-gray relative z-10">

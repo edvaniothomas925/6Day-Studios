@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Video, Music, Play, Headphones, X, ArrowRight, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Video, Music, Play, Headphones, X, ArrowRight, Plus, ChevronLeft, ChevronRight, Loader2, Share2, Facebook, Twitter, MessageCircle, Link as LinkIcon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { cn } from '../lib/utils';
+import { cn, getDirectLink, getYoutubeThumbnailFallback } from '../lib/utils';
+import { toast } from 'sonner';
 import { Project } from '../types';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { Skeleton } from '../components/Skeleton';
@@ -14,8 +15,22 @@ const PortfolioPage = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [visibleCount, setVisibleCount] = useState(6);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [isModalReady, setIsModalReady] = useState(false);
 
   const mainCategories = useMemo(() => ['all', 'video', 'audio'], []);
+
+  useEffect(() => {
+    if (selectedProject) {
+      // Pequeno delay para permitir que a animação do modal comece sem travar a UI
+      const timer = setTimeout(() => {
+        setIsModalReady(true);
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setIsModalReady(false);
+      setIsVideoLoading(true);
+    }
+  }, [selectedProject]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -23,7 +38,15 @@ const PortfolioPage = () => {
     if (portfolioParam && mainCategories.includes(portfolioParam)) {
       setFilter(portfolioParam);
     }
-  }, []);
+
+    const projectParam = params.get('project');
+    if (projectParam && projects.length > 0) {
+      const project = projects.find(p => p.id === projectParam);
+      if (project) {
+        setSelectedProject(project);
+      }
+    }
+  }, [projects, mainCategories]);
 
   const subCategories = useMemo(() => {
     if (filter === 'all') return [];
@@ -61,6 +84,29 @@ const PortfolioPage = () => {
     }
     setSelectedProject(filteredProjects[nextIndex]);
     setIsVideoLoading(true);
+  };
+
+  const shareProject = (platform: 'whatsapp' | 'facebook' | 'twitter' | 'copy') => {
+    if (!selectedProject) return;
+    
+    const shareUrl = `${window.location.origin}/?project=${selectedProject.id}`;
+    const shareText = `Confira este projeto incrível: ${selectedProject.title}`;
+
+    switch (platform) {
+      case 'whatsapp':
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`, '_blank');
+        break;
+      case 'facebook':
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      case 'twitter':
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copiado para a área de transferência!');
+        break;
+    }
   };
 
   useEffect(() => {
@@ -140,15 +186,24 @@ const PortfolioPage = () => {
                 onClick={() => setSelectedProject(project)}
               >
                 <div className="w-full h-full relative">
-                  {project.thumbnail ? (
-                    <OptimizedImage 
-                      src={project.thumbnail} 
-                      alt={project.title}
-                      loading="lazy"
-                      containerClassName="w-full h-full"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                    />
+                  {project.thumbnail || (project.type === 'video' && getYoutubeThumbnailFallback(project.videoUrl || '')) ? (
+                    <>
+                      <OptimizedImage 
+                        src={project.thumbnail || getYoutubeThumbnailFallback(project.videoUrl || '')} 
+                        alt={project.title}
+                        loading="lazy"
+                        containerClassName="w-full h-full"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                      />
+                      {project.type === 'video' && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-16 h-12 bg-red-600 rounded-xl flex items-center justify-center transform transition-transform duration-300 group-hover:scale-110 group-hover:bg-red-500 shadow-2xl">
+                            <Play className="w-6 h-6 text-white fill-white ml-1" />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-premium-gray to-black flex flex-col items-center justify-center p-8 transition-transform duration-700 group-hover:scale-110">
                       <div className="w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center mb-4 group-hover:bg-gold/20 transition-colors">
@@ -217,43 +272,64 @@ const PortfolioPage = () => {
               onClick={e => e.stopPropagation()}
             >
               <div className="aspect-video bg-black relative flex items-center justify-center">
-                {selectedProject.type === 'video' ? (
+                {!isModalReady || isVideoLoading ? (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-premium-gray">
+                    <Skeleton className="absolute inset-0" />
+                    <Loader2 className="w-10 h-10 text-gold animate-spin relative z-20" />
+                  </div>
+                ) : null}
+
+                {isModalReady && (
                   <>
-                    {isVideoLoading && (
-                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-premium-gray">
-                        <Skeleton className="absolute inset-0" />
-                        <Loader2 className="w-10 h-10 text-gold animate-spin relative z-20" />
+                    {selectedProject.videoUrl?.includes('youtube.com') || 
+                     selectedProject.videoUrl?.includes('youtu.be') || 
+                     selectedProject.audioUrl?.includes('youtube.com') || 
+                     selectedProject.audioUrl?.includes('youtu.be') ||
+                     selectedProject.audioUrl?.includes('soundcloud.com') ? (
+                      <iframe
+                        className={cn(
+                          "w-full h-full transition-opacity duration-500",
+                          isVideoLoading ? "opacity-0" : "opacity-100"
+                        )}
+                        src={getDirectLink(selectedProject.videoUrl || selectedProject.audioUrl || '')}
+                        title={selectedProject.title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        loading="lazy"
+                        onLoad={() => setIsVideoLoading(false)}
+                      ></iframe>
+                    ) : selectedProject.type === 'video' ? (
+                      <video 
+                        className={cn(
+                          "w-full h-full transition-opacity duration-500",
+                          isVideoLoading ? "opacity-0" : "opacity-100"
+                        )}
+                        src={selectedProject.videoUrl}
+                        controls
+                        autoPlay
+                        playsInline
+                        preload="metadata"
+                        onLoadedData={() => setIsVideoLoading(false)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-12 bg-gradient-to-br from-premium-gray to-black">
+                        <div className="w-32 h-32 bg-gold/10 rounded-full flex items-center justify-center mb-8 animate-pulse">
+                          <Music className="w-16 h-16 text-gold" />
+                        </div>
+                        <audio 
+                          controls 
+                          autoPlay
+                          preload="metadata"
+                          className="w-full max-w-md custom-audio-player"
+                          src={selectedProject.audioUrl}
+                          onLoadedData={() => setIsVideoLoading(false)}
+                        >
+                          Seu navegador não suporta o elemento de áudio.
+                        </audio>
                       </div>
                     )}
-                    <iframe
-                      className={cn(
-                        "w-full h-full transition-opacity duration-500",
-                        isVideoLoading ? "opacity-0" : "opacity-100"
-                      )}
-                      src={selectedProject.videoUrl}
-                      title={selectedProject.title}
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      loading="lazy"
-                      onLoad={() => setIsVideoLoading(false)}
-                    ></iframe>
                   </>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-12 bg-gradient-to-br from-premium-gray to-black">
-                    <div className="w-32 h-32 bg-gold/10 rounded-full flex items-center justify-center mb-8 animate-pulse">
-                      <Music className="w-16 h-16 text-gold" />
-                    </div>
-                    <audio 
-                      controls 
-                      autoPlay
-                      preload="metadata"
-                      className="w-full max-w-md custom-audio-player"
-                      src={selectedProject.audioUrl}
-                    >
-                      Seu navegador não suporta o elemento de áudio.
-                    </audio>
-                  </div>
                 )}
                 <button 
                   className="absolute top-4 right-4 p-2 bg-black/50 rounded-full hover:bg-gold transition-colors z-20"
@@ -290,6 +366,40 @@ const PortfolioPage = () => {
                   <p className="text-white/60 text-sm md:text-base leading-relaxed max-w-2xl">
                     {selectedProject.description}
                   </p>
+
+                  <div className="mt-8 flex flex-wrap items-center gap-4">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30">Compartilhar:</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => shareProject('whatsapp')}
+                        className="p-2.5 bg-white/5 hover:bg-[#25D366] hover:text-white rounded-full transition-all border border-white/5"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => shareProject('facebook')}
+                        className="p-2.5 bg-white/5 hover:bg-[#1877F2] hover:text-white rounded-full transition-all border border-white/5"
+                        title="Facebook"
+                      >
+                        <Facebook className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => shareProject('twitter')}
+                        className="p-2.5 bg-white/5 hover:bg-black hover:text-white rounded-full transition-all border border-white/5"
+                        title="Twitter"
+                      >
+                        <Twitter className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => shareProject('copy')}
+                        className="p-2.5 bg-white/5 hover:bg-gold hover:text-black rounded-full transition-all border border-white/5"
+                        title="Copiar Link"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex-shrink-0">
                   <a 
