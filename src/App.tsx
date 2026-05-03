@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { AppProvider } from './context/AppContext';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
+import { BudgetCalculator } from './components/BudgetCalculator';
 import { Loader2 } from 'lucide-react';
 
 // Lazy load pages
@@ -26,6 +27,7 @@ export default function App() {
       <Router>
         <ScrollToTop />
         <Toaster position="top-right" theme="dark" richColors />
+        <BudgetCalculator />
         <Layout>
           <Suspense fallback={<PageLoader />}>
             <Routes>

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, Play, Music, Mic, Video, Camera, Star, Users, Award, Clock, ChevronDown } from 'lucide-react';
+import { ArrowRight, Play, Music, Mic, Video, Camera, Star, Users, Award, Clock, ChevronDown, Check, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { OptimizedImage } from '../components/OptimizedImage';
@@ -260,6 +260,89 @@ const Home = () => {
           </div>
         </section>
       )}
+
+      {/* Differentiator: Smart Budget Calculator */}
+      <section className="py-24 px-6 relative z-10 overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="glass-card p-12 md:p-20 relative overflow-hidden group border-gold/10">
+            <div className="absolute inset-0 bg-gradient-to-br from-gold/5 via-transparent to-transparent opacity-50" />
+            
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <div>
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                >
+                  <span className="text-gold text-[10px] font-black tracking-[0.4em] uppercase mb-6 block">Inovação Tecnológica</span>
+                  <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-8 leading-[1.1] uppercase">
+                    Seu Orçamento <br /> 
+                    <span className="text-gold-gradient italic">Inteligente</span> & Transparente
+                  </h2>
+                  <p className="text-white/50 text-lg mb-10 font-light leading-relaxed">
+                    Fomos além de um portfólio comum. Desenvolvemos uma ferramenta exclusiva para você combinar nossos serviços premium e obter uma estimativa de investimento instantânea.
+                  </p>
+                  <div className="space-y-4 mb-12">
+                     {[
+                       'Combine múltiplos serviços (Áudio, Vídeo, Edição)',
+                       'Preços em tempo real baseados na nossa tabela oficial',
+                       'Envio direto para nossa equipa via WhatsApp'
+                     ].map((item, i) => (
+                       <div key={i} className="flex items-center gap-3 text-sm text-white/70">
+                         <div className="w-5 h-5 rounded-full bg-gold/10 flex items-center justify-center text-gold">
+                           <Check className="w-3 h-3" />
+                         </div>
+                         {item}
+                       </div>
+                     ))}
+                  </div>
+                </motion.div>
+              </div>
+
+              <div className="relative">
+                <motion.div
+                   initial={{ opacity: 0, scale: 0.8 }}
+                   whileInView={{ opacity: 1, scale: 1 }}
+                   viewport={{ once: true }}
+                   className="relative z-10 bg-premium-gray rounded-3xl p-8 border border-white/10 shadow-2xl"
+                >
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-gold">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <span className="font-bold uppercase tracking-widest text-xs">Exemplo de Pacote</span>
+                    </div>
+                    <div className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold uppercase">Activo</div>
+                  </div>
+
+                  <div className="space-y-4 mb-8">
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                       <span className="text-sm font-medium">Beat Exclusivo</span>
+                       <span className="text-gold font-bold">Kz 50.000</span>
+                    </div>
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                       <span className="text-sm font-medium">Videoclipe Cinematic</span>
+                       <span className="text-gold font-bold">Kz 150.000</span>
+                    </div>
+                    <div className="p-4 rounded-xl bg-white/10 border border-gold/30 flex justify-between items-center scale-105 shadow-xl">
+                       <span className="text-sm font-bold">Total Estimado</span>
+                       <span className="text-xl font-black text-white tracking-tighter tabular-nums">Kz 200.000</span>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-white/30 text-center uppercase tracking-widest font-black">
+                    Experimente agora clicando no ícone da calculadora
+                  </p>
+                </motion.div>
+
+                {/* Decorative glow */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gold/10 blur-[100px] -z-10 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Process Section */}
       <section className="py-32 px-6 bg-premium-gray relative z-10">

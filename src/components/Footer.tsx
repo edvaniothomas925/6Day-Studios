@@ -15,8 +15,10 @@ const Footer = React.memo(() => {
 
   const handleAdminLogin = async () => {
     try {
-      await signInWithGoogle();
-      toast.success('Login realizado com sucesso!');
+      const result = await signInWithGoogle();
+      if (result) {
+        toast.success('Login realizado com sucesso!');
+      }
     } catch (error) {
       toast.error('Erro ao realizar login.');
     }
@@ -136,9 +138,9 @@ const Footer = React.memo(() => {
             {!user ? (
               <button 
                 onClick={handleAdminLogin}
-                className="hover:text-gold transition-colors flex items-center gap-1"
+                className="hover:text-gold transition-colors"
               >
-                <Lock className="w-3 h-3" /> Acesso Restrito
+                Entrar
               </button>
             ) : (
               <span className="text-gold/40 flex items-center gap-1">

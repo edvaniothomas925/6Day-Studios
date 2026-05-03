@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Video, Music } from 'lucide-react';
+import { Check, Video, Music, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { cn } from '../lib/utils';
 
@@ -88,7 +88,7 @@ const ServicesPage = () => {
           </AnimatePresence>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
           <AnimatePresence mode="popLayout">
             {filteredServices.map((service) => (
               <motion.div 
@@ -142,6 +142,29 @@ const ServicesPage = () => {
             ))}
           </AnimatePresence>
         </div>
+
+        {/* Budget Calculator CTA */}
+        <motion.div
+           initial={{ opacity: 0, y: 30 }}
+           whileInView={{ opacity: 1, y: 0 }}
+           viewport={{ once: true }}
+           className="relative overflow-hidden rounded-3xl bg-gold p-8 md:p-12 text-black"
+        >
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="max-w-xl text-center md:text-left">
+              <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">Precisa de um pacote sob medida?</h2>
+              <p className="text-black/70 font-medium">Use nossa Calculadora Inteligente para combinar serviços e obter uma estimativa instantânea do seu projeto.</p>
+            </div>
+            <div className="flex shrink-0">
+               <div className="w-20 h-20 rounded-full bg-black flex items-center justify-center animate-bounce shadow-2xl">
+                  <ArrowRight className="w-8 h-8 text-gold rotate-45" />
+               </div>
+            </div>
+          </div>
+          {/* Decorative circles */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+        </motion.div>
       </div>
     </div>
   );

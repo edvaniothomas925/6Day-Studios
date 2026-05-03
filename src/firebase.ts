@@ -1,16 +1,37 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
-import { getFirestore, collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Use initializeFirestore instead of getFirestore to enable long polling
+// This fixes "Could not reach Cloud Firestore backend" in sandboxed environments
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
+
 export const googleProvider = new GoogleAuthProvider();
 
 // Auth Helpers
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+let isSigningIn = false;
+export const signInWithGoogle = async () => {
+  if (isSigningIn) return;
+  isSigningIn = true;
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error: any) {
+    if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+      console.log('Login popup closed or cancelled by user');
+      return null;
+    }
+    throw error;
+  } finally {
+    isSigningIn = false;
+  }
+};
 export const logout = () => signOut(auth);
 
 // Firestore Error Handler

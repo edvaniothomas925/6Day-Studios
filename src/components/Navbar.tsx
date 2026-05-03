@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, LogIn, LogOut, User as UserIcon, Shield, Instagram, Facebook, Youtube, ArrowRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { auth, signInWithGoogle, logout } from '../firebase';
 import { useApp } from '../context/AppContext';
@@ -30,6 +31,17 @@ const Navbar = React.memo(() => {
   ], []);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogin = async () => {
+    try {
+      const result = await signInWithGoogle();
+      if (result) {
+        toast.success('Bem-vindo(a)!');
+      }
+    } catch (error) {
+      toast.error('Ocorreu um erro ao tentar entrar.');
+    }
+  };
 
   return (
     <>
@@ -96,7 +108,14 @@ const Navbar = React.memo(() => {
                   <LogOut className="w-5 h-5" />
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <button 
+                onClick={handleLogin}
+                className="flex items-center gap-2 px-4 py-2 text-white/70 hover:text-gold transition-colors text-sm font-bold uppercase tracking-widest"
+              >
+                <LogIn className="w-4 h-4" /> Entrar
+              </button>
+            )}
 
             <a 
               href={`https://wa.me/${settings.whatsapp}`}
@@ -219,7 +238,17 @@ const Navbar = React.memo(() => {
                       </button>
                     </div>
                   </motion.div>
-                ) : null}
+                ) : (
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }}
+                    className="w-full py-5 bg-white/5 border border-white/10 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-3"
+                  >
+                    <LogIn className="w-4 h-4" /> Fazer Login
+                  </motion.button>
+                )}
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
