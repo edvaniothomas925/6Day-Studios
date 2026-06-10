@@ -42,6 +42,21 @@
       },
       "required": ["title", "category", "type", "description", "basePrice", "features"]
     },
+    "Product": {
+      "title": "Product",
+      "description": "Um produto físico ou digital vendido pela produtora.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["digital", "physical"] },
+        "externalUrl": { "type": "string" }
+      },
+      "required": ["title", "description", "price", "imageUrl", "category"]
+    },
     "Settings": {
       "title": "Settings",
       "description": "Configurações globais da produtora (contato, redes sociais, etc).",
@@ -72,6 +87,10 @@
     "/services": {
       "schema": "Service",
       "description": "Serviços e planos oferecidos"
+    },
+    "/products": {
+      "schema": "Product",
+      "description": "Produtos vendidos pela produtora"
     },
     "/settings/{settingId}": {
       "schema": "Settings",

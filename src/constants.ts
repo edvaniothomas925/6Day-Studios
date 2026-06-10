@@ -19,6 +19,17 @@ export interface Service {
   type: 'video' | 'audio';
 }
 
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  category: string;
+  type?: 'digital' | 'physical';
+  externalUrl?: string;
+}
+
 export const PROJECTS: Project[] = [
   {
     id: '1',
@@ -148,5 +159,44 @@ export const SERVICES: Service[] = [
     description: 'Captação e edição de áudio para podcasts e publicidade.',
     basePrice: 400,
     features: ['Captação em Estúdio', 'Edição de Diálogos', 'Sound Design', 'Trilha Sonora Original']
+  }
+];
+
+export const PRODUCTS: Product[] = [
+  {
+    id: '1',
+    title: 'Pack de LUTs Cinematic Angola',
+    description: 'Estilo de cor cinematográfico quente e moderno inspirado no sol de Luanda para Premiere, After Effects e DaVinci Resolve.',
+    price: 15000,
+    imageUrl: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=800',
+    category: 'LUTs',
+    type: 'digital'
+  },
+  {
+    id: '2',
+    title: 'Transições de Vídeo Ultra Premium',
+    description: 'Transições dinâmicas rápidas e efeitos com glitch, zoom e desfoque prontos para Premiere Pro e CapCut.',
+    price: 10000,
+    imageUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&q=80&w=800',
+    category: 'Video Assets',
+    type: 'digital'
+  },
+  {
+    id: '3',
+    title: 'Templates para Reels e TikTok',
+    description: 'Modelos editáveis no Canva e CapCut estruturados para reter atenção e aumentar o alcance dos seus vídeos.',
+    price: 5000,
+    imageUrl: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&q=80&w=800',
+    category: 'Templates',
+    type: 'digital'
+  },
+  {
+    id: '4',
+    title: 'Efeitos Sonoros Essentials Vol. 1',
+    description: 'Coleção de efeitos de áudio premium contendo risers, swooshes, hits e ambiências de alto impacto para edição profissional.',
+    price: 8000,
+    imageUrl: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&q=80&w=800',
+    category: 'Audio Assets',
+    type: 'digital'
   }
 ];

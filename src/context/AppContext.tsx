@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, onSnapshot, setDoc, getDoc, addDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { Project, Service, Settings, AppContextType } from '../types';
-import { PROJECTS, SERVICES } from '../constants';
+import { Project, Service, Settings, AppContextType, Product } from '../types';
+import { PROJECTS, SERVICES, PRODUCTS } from '../constants';
 
 const DEFAULT_SETTINGS: Settings = {
   logoUrl: '/Logo.png',
@@ -22,6 +22,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -82,15 +83,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubServices = onSnapshot(collection(db, 'services'), (snapshot) => {
       const servicesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
       setServices(servicesData);
-      setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'services');
+    });
+
+    // Products Listener
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      setProducts(productsData);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'products');
     });
 
     return () => {
       unsubscribeAuth();
       unsubProjects();
       unsubServices();
+      unsubProducts();
       unsubSettings();
     };
   }, []);
@@ -112,6 +122,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await addDoc(collection(db, 'services'), rest);
         }
       }
+      if (products.length === 0) {
+        for (const prod of PRODUCTS) {
+          const { id, ...rest } = prod;
+          await addDoc(collection(db, 'products'), rest);
+        }
+      }
       const settingsSnap = await getDoc(doc(db, 'settings', 'main'));
       if (!settingsSnap.exists()) {
         await setDoc(doc(db, 'settings', 'main'), DEFAULT_SETTINGS);
@@ -124,7 +140,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     seedData();
-  }, [isAdmin, loading, projects.length, services.length]);
+  }, [isAdmin, loading, projects.length, services.length, products.length]);
 
   const setIsAdminOpenCallback = React.useCallback((open: boolean) => {
     setIsAdminOpen(open);
@@ -137,6 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const contextValue = React.useMemo(() => ({
     projects,
     services,
+    products,
     settings,
     user,
     isAdmin,
@@ -145,7 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isMobileMenuOpen,
     setIsAdminOpen: setIsAdminOpenCallback,
     setIsMobileMenuOpen: setIsMobileMenuOpenCallback
-  }), [projects, services, settings, user, isAdmin, loading, isAdminOpen, isMobileMenuOpen, setIsAdminOpenCallback, setIsMobileMenuOpenCallback]);
+  }), [projects, services, products, settings, user, isAdmin, loading, isAdminOpen, isMobileMenuOpen, setIsAdminOpenCallback, setIsMobileMenuOpenCallback]);
 
   return (
     <AppContext.Provider value={contextValue}>

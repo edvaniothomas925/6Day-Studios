@@ -33,9 +33,21 @@ export interface Settings {
   tiktok?: string;
 }
 
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  category: string;
+  type?: 'digital' | 'physical';
+  externalUrl?: string;
+}
+
 export interface AppContextType {
   projects: Project[];
   services: Service[];
+  products: Product[];
   settings: Settings;
   user: User | null;
   isAdmin: boolean;

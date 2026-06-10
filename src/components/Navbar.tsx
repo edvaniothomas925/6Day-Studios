@@ -27,6 +27,7 @@ const Navbar = React.memo(() => {
     { name: 'Home', href: '/' },
     { name: 'Portfólio', href: '/portfolio' },
     { name: 'Serviços', href: '/servicos' },
+    { name: 'Produtos', href: '/produtos' },
     { name: 'Sobre', href: '/sobre' },
   ], []);
 

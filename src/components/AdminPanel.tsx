@@ -5,23 +5,25 @@ import { collection, addDoc, doc, setDoc, updateDoc, deleteDoc } from 'firebase/
 import { toast } from 'sonner';
 import { cn, getDirectLink, getYoutubeThumbnail, getYoutubeThumbnailFallback, isValidMediaUrl } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Project, Service, Settings } from '../types';
+import { Project, Service, Settings, Product } from '../types';
 import { useApp } from '../context/AppContext';
 
 const AdminPanel = () => {
-  const { projects, services, settings, setIsAdminOpen } = useApp();
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'services' | 'settings'>('portfolio');
+  const { projects, services, products, settings, setIsAdminOpen } = useApp();
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'services' | 'products' | 'settings'>('portfolio');
 
   // Pagination states
   const [portfolioPage, setPortfolioPage] = useState(1);
   const [servicesPage, setServicesPage] = useState(1);
+  const [productsPage, setProductsPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   // Form states
   const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingSettings, setEditingSettings] = useState<Settings>(settings);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'project' | 'service', title: string } | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'project' | 'service' | 'product', title: string } | null>(null);
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,14 +83,17 @@ const AdminPanel = () => {
       if (itemToDelete.type === 'project') {
         await deleteDoc(doc(db, 'projects', itemToDelete.id));
         toast.success('Projeto excluído com sucesso.');
-      } else {
+      } else if (itemToDelete.type === 'service') {
         await deleteDoc(doc(db, 'services', itemToDelete.id));
         toast.success('Serviço excluído.');
+      } else {
+        await deleteDoc(doc(db, 'products', itemToDelete.id));
+        toast.success('Produto excluído.');
       }
       setItemToDelete(null);
     } catch (error) {
-      toast.error(`Erro ao excluir ${itemToDelete.type === 'project' ? 'projeto' : 'serviço'}.`);
-      handleFirestoreError(error, OperationType.DELETE, itemToDelete.type === 'project' ? 'projects' : 'services');
+      toast.error(`Erro ao excluir ${itemToDelete.type === 'project' ? 'projeto' : itemToDelete.type === 'service' ? 'serviço' : 'produto'}.`);
+      handleFirestoreError(error, OperationType.DELETE, itemToDelete.type === 'project' ? 'projects' : itemToDelete.type === 'service' ? 'services' : 'products');
     }
   };
 
@@ -125,6 +130,39 @@ const AdminPanel = () => {
     }
   };
 
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    try {
+      if (editingProduct.id) {
+        const { id, ...data } = editingProduct;
+        await updateDoc(doc(db, 'products', id), {
+          ...data,
+          price: Number(data.price || 0)
+        });
+        toast.success('Produto atualizado!');
+      } else {
+        await addDoc(collection(db, 'products'), {
+          ...editingProduct,
+          price: Number(editingProduct.price || 0)
+        });
+        toast.success('Novo produto adicionado!');
+      }
+      setEditingProduct(null);
+    } catch (error) {
+      toast.error('Erro ao salvar produto.');
+      handleFirestoreError(error, OperationType.WRITE, 'products');
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    const product = products.find(p => p.id === id);
+    if (product) {
+      setItemToDelete({ id, type: 'product', title: product.title });
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -154,6 +192,12 @@ const AdminPanel = () => {
   const paginatedServices = services.slice(
     (servicesPage - 1) * ITEMS_PER_PAGE,
     servicesPage * ITEMS_PER_PAGE
+  );
+
+  const totalProductsPages = Math.ceil((products || []).length / ITEMS_PER_PAGE);
+  const paginatedProducts = (products || []).slice(
+    (productsPage - 1) * ITEMS_PER_PAGE,
+    productsPage * ITEMS_PER_PAGE
   );
 
   return (
@@ -199,6 +243,15 @@ const AdminPanel = () => {
           )}
         >
           Serviços
+        </button>
+        <button 
+          onClick={() => setActiveTab('products')}
+          className={cn(
+            "px-6 md:px-8 py-3 md:py-4 text-xs md:text-sm font-bold transition-all border-b-2 whitespace-nowrap",
+            activeTab === 'products' ? "border-gold text-gold" : "border-transparent text-white/40 hover:text-white"
+          )}
+        >
+          Produtos
         </button>
         <button 
           onClick={() => setActiveTab('settings')}
@@ -345,6 +398,79 @@ const AdminPanel = () => {
                   <button
                     disabled={servicesPage === totalServicesPages}
                     onClick={() => setServicesPage(prev => Math.min(totalServicesPages, prev + 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'products' && (
+            <div className="space-y-6 md:space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h3 className="text-xl md:text-2xl font-bold">Gerenciar Produtos da Loja</h3>
+                <button 
+                  onClick={() => setEditingProduct({ category: 'LUTs', price: 0 } as any)}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-gold text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Novo Produto
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {paginatedProducts.map(product => (
+                  <div key={product.id} className="bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 group flex items-start gap-4">
+                    <img 
+                      src={product.imageUrl} 
+                      alt={product.title} 
+                      className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-base md:text-lg truncate">{product.title}</h4>
+                          <p className="text-[10px] md:text-xs text-gold font-bold uppercase tracking-widest">{product.category}</p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button 
+                            onClick={() => setEditingProduct(product)}
+                            className="p-2 bg-white/5 hover:bg-gold hover:text-black rounded-lg transition-all"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="p-2 bg-white/5 hover:bg-red-500 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-white/40 mt-2 line-clamp-2">{product.description}</p>
+                      <div className="text-lg font-bold mt-2 text-white">Kz {product.price.toLocaleString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Products Pagination Controls */}
+              {totalProductsPages > 1 && (
+                <div className="flex items-center justify-center gap-4 pt-4">
+                  <button
+                    disabled={productsPage === 1}
+                    onClick={() => setProductsPage(prev => Math.max(1, prev - 1))}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                    Página {productsPage} de {totalProductsPages}
+                  </span>
+                  <button
+                    disabled={productsPage === totalProductsPages}
+                    onClick={() => setProductsPage(prev => Math.min(totalProductsPages, prev + 1))}
                     className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
                   >
                     Próxima
@@ -794,6 +920,131 @@ const AdminPanel = () => {
                     className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-105 transition-transform"
                   >
                     Salvar Serviço
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {editingProduct && (
+          <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              className="bg-premium-gray border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-5 md:p-8"
+            >
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h3 className="text-xl md:text-2xl font-bold">{editingProduct.id ? 'Editar Produto' : 'Novo Produto'}</h3>
+                <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
+              </div>
+
+              <form onSubmit={handleSaveProduct} className="space-y-5 md:space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Nome do Produto</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingProduct.title || ''}
+                      onChange={e => setEditingProduct({...editingProduct, title: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: Cinematic Pack LUTs Angola"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Categoria</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingProduct.category || ''}
+                      onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: LUTs, Templates, Presets..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Preço (Kz)</label>
+                    <input 
+                      required
+                      type="number" 
+                      value={editingProduct.price || ''}
+                      onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Preço em Kwanzas"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Tipo de Distribuição</label>
+                    <select 
+                      value={editingProduct.type || 'digital'}
+                      onChange={e => setEditingProduct({...editingProduct, type: e.target.value as any})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                    >
+                      <option value="digital">Digital (Download / Envio Online)</option>
+                      <option value="physical">Físico (Entrega Física)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Link de Compra Direta (Opcional)</label>
+                    <input 
+                      type="text" 
+                      value={editingProduct.externalUrl || ''}
+                      onChange={e => setEditingProduct({...editingProduct, externalUrl: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: Link do Gumroad, Hotmart (Senão, WhatsApp)"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Link da Imagem do Produto</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingProduct.imageUrl || ''}
+                      onChange={e => setEditingProduct({...editingProduct, imageUrl: getDirectLink(e.target.value)})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-sm"
+                      placeholder="URL da Imagem (Google Drive ou Link Direto)"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/30">Dica de Links de Imagem Externos</label>
+                    <p className="text-[10px] text-white/50 leading-relaxed mb-1">
+                      Você pode colocar um link compartilhado do <strong>Google Drive</strong> e nosso sistema resolverá para uma imagem direta exibível.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Descrição Detalhada do Produto</label>
+                    <textarea 
+                      required
+                      value={editingProduct.description || ''}
+                      onChange={e => setEditingProduct({...editingProduct, description: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all h-32 resize-none"
+                      placeholder="Fale sobre o que vem no produto, formato do arquivo, etc..."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="flex-1 py-4 bg-white/5 rounded-xl font-bold hover:bg-white/10 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-105 transition-transform"
+                  >
+                    Salvar Produto
                   </button>
                 </div>
               </form>
