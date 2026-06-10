@@ -4,6 +4,7 @@ import { ArrowRight, Play, Music, Mic, Video, Camera, Star, Users, Award, Clock,
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { getWhatsAppUrl } from '../lib/utils';
 
 const Home = () => {
   const { settings, projects } = useApp();
@@ -99,7 +100,7 @@ const Home = () => {
               <Link to="/portfolio" className="w-full sm:w-auto px-10 py-5 bg-gold text-black font-black text-sm uppercase tracking-widest rounded-full flex items-center justify-center gap-3 hover:bg-white transition-all group shadow-[0_0_30px_rgba(212,175,55,0.3)]">
                 Explorar Portfólio <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <a href={`https://wa.me/${settings.whatsapp}`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/10 text-white font-black text-sm uppercase tracking-widest rounded-full hover:bg-white/10 transition-all backdrop-blur-md">
+              <a href={getWhatsAppUrl(settings.whatsapp)} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/10 text-white font-black text-sm uppercase tracking-widest rounded-full hover:bg-white/10 transition-all backdrop-blur-md">
                 Iniciar Projeto
               </a>
             </div>
@@ -422,7 +423,7 @@ const Home = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
               <a 
-                href={`https://wa.me/${settings.whatsapp}`}
+                href={getWhatsAppUrl(settings.whatsapp)}
                 className="w-full sm:w-auto px-12 py-6 bg-gold text-black font-black text-xl uppercase tracking-widest rounded-full hover:scale-105 transition-transform shadow-[0_20px_50px_rgba(212,175,55,0.3)]"
               >
                 Falar no WhatsApp

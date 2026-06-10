@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
+import { getWhatsAppUrl } from '../lib/utils';
 
 const WhatsAppButton = () => {
   const { settings, isMobileMenuOpen } = useApp();
@@ -24,7 +25,7 @@ const WhatsAppButton = () => {
           exit={{ scale: 0, opacity: 0, y: 20 }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          href={`https://wa.me/${settings.whatsapp}`}
+          href={getWhatsAppUrl(settings.whatsapp)}
           target="_blank" 
           rel="noopener noreferrer"
           className="fixed bottom-8 right-8 z-40 w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl transition-shadow hover:shadow-[0_0_30px_rgba(37,211,102,0.5)] group"

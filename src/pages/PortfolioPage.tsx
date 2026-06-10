@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Video, Music, Play, Headphones, X, ArrowRight, Plus, ChevronLeft, ChevronRight, Loader2, Share2, Facebook, Twitter, MessageCircle, Link as LinkIcon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { cn, getDirectLink, getYoutubeThumbnailFallback } from '../lib/utils';
+import { cn, getDirectLink, getYoutubeThumbnailFallback, getWhatsAppUrl } from '../lib/utils';
 import { toast } from 'sonner';
 import { Project } from '../types';
 import { OptimizedImage } from '../components/OptimizedImage';
@@ -403,7 +403,7 @@ const PortfolioPage = () => {
                 </div>
                 <div className="flex-shrink-0">
                   <a 
-                    href={`https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(`Olá! Vi o projeto "${selectedProject.title}" no seu portfólio e gostaria de saber mais.`)}`}
+                    href={getWhatsAppUrl(settings.whatsapp, `Olá! Vi o projeto "${selectedProject.title}" no seu portfólio e gostaria de saber mais.`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full md:w-auto px-8 py-4 bg-gold text-black font-bold rounded-full flex items-center justify-center gap-2 hover:scale-105 transition-transform"

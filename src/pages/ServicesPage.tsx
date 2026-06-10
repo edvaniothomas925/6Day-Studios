@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, Video, Music, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { cn } from '../lib/utils';
+import { cn, getWhatsAppUrl } from '../lib/utils';
 
 const ServicesPage = () => {
   const { services, settings } = useApp();
@@ -131,7 +131,7 @@ const ServicesPage = () => {
                 </ul>
 
                 <a 
-                  href={`https://wa.me/${settings.whatsapp}?text=${encodeURIComponent(`Olá! Tenho interesse no serviço de ${service.title}.`)}`}
+                  href={getWhatsAppUrl(settings.whatsapp, `Olá! Tenho interesse no serviço de ${service.title}.`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-4 bg-white/10 border border-white/20 text-white text-center font-bold rounded-xl hover:bg-gold hover:text-black transition-all"

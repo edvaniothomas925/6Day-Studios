@@ -8,7 +8,7 @@ import { PROJECTS, SERVICES } from '../constants';
 const DEFAULT_SETTINGS: Settings = {
   logoUrl: '/Logo.png',
   mapEmbedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4676.225045842936!2d13.324142779345703!3d-8.861308799999986!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1a51f72454cf91d5%3A0x426b2c5d72b38e02!2s6Day%20Studios!5e1!3m2!1spt-PT!2sao!4v1774517180253!5m2!1spt-PT!2sao',
-  whatsapp: '244927937226',
+  whatsapp: '+244 945 986 037',
   email: '6daystudio26@gmail.com',
   address: 'Viana Bela Vista, Rua da Escolinha, Luanda, Angola',
   instagram: 'https://instagram.com/6daystudios_',
@@ -115,6 +115,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const settingsSnap = await getDoc(doc(db, 'settings', 'main'));
       if (!settingsSnap.exists()) {
         await setDoc(doc(db, 'settings', 'main'), DEFAULT_SETTINGS);
+      } else {
+        const currentData = settingsSnap.data();
+        if (currentData && (currentData.whatsapp === '244927937226' || !currentData.whatsapp)) {
+          await setDoc(doc(db, 'settings', 'main'), { whatsapp: '+244 945 986 037' }, { merge: true });
+        }
       }
     };
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Calculator, Check, Plus, MessageCircle, X, Sparkles, Receipt, ArrowRight, Lock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Service } from '../types';
-import { cn } from '../lib/utils';
+import { cn, getWhatsAppUrl } from '../lib/utils';
 import { toast } from 'sonner';
 
 export const BudgetCalculator = () => {
@@ -40,10 +40,10 @@ export const BudgetCalculator = () => {
       toast.error('Por favor, verifique o seu e-mail antes de solicitar propostas.');
       return;
     }
-    const itemsList = selectedItems.map(s => `- ${s.title}: ${new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(s.basePrice)}`).join('%0A');
+    const itemsList = selectedItems.map(s => `- ${s.title}: ${new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(s.basePrice)}`).join('\n');
     const totalFormatted = new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(totalPrice);
-    const message = `Olá! Estive a usar a Calculadora de Orçamento no site da 6Day Studios e gostaria de mais informações sobre estes serviços:%0A%0A${itemsList}%0A%0A*Total Estimado: ${totalFormatted}*%0A%0AComo podemos prosseguir?`;
-    window.open(`https://wa.me/${settings.whatsapp}?text=${message}`, '_blank');
+    const message = `Olá! Estive a usar a Calculadora de Orçamento no site da 6Day Studios e gostaria de mais informações sobre estes serviços:\n\n${itemsList}\n\n*Total Estimado: ${totalFormatted}*\n\nComo podemos prosseguir?`;
+    window.open(getWhatsAppUrl(settings.whatsapp, message), '_blank');
   };
 
   const handleOpen = () => {

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, LogIn, LogOut, User as UserIcon, Shield, Instagram, Facebook, Youtube, ArrowRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
-import { cn } from '../lib/utils';
+import { cn, getWhatsAppUrl } from '../lib/utils';
 import { auth, signInWithGoogle, logout } from '../firebase';
 import { useApp } from '../context/AppContext';
 
@@ -118,7 +118,7 @@ const Navbar = React.memo(() => {
             )}
 
             <a 
-              href={`https://wa.me/${settings.whatsapp}`}
+              href={getWhatsAppUrl(settings.whatsapp)}
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-2 bg-gold text-black text-sm font-bold rounded-full hover:scale-105 transition-transform"
@@ -257,7 +257,7 @@ const Navbar = React.memo(() => {
                   className="space-y-4"
                 >
                   <a 
-                    href={`https://wa.me/${settings.whatsapp}`}
+                    href={getWhatsAppUrl(settings.whatsapp)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-5 bg-gold text-black text-center font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-gold/20 flex items-center justify-center gap-3"

@@ -104,3 +104,9 @@ export function isValidMediaUrl(url: string): boolean {
     return false;
   }
 }
+
+export function getWhatsAppUrl(phone: string, text?: string): string {
+  if (!phone) return '#';
+  const cleanPhone = phone.replace(/\D/g, '');
+  return `https://wa.me/${cleanPhone}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+}
