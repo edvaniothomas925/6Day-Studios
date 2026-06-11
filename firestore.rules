@@ -120,6 +120,59 @@ service cloud.firestore {
              (!('address' in data) || (data.address is string && data.address.size() < 500));
     }
 
+    function isValidBooking(data) {
+      return data.keys().hasAll(['clientName', 'clientEmail', 'clientPhone', 'date', 'timeSlot', 'serviceType', 'status']) &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.clientEmail is string && data.clientEmail.size() < 256 && data.clientEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.clientPhone is string && data.clientPhone.size() > 0 && data.clientPhone.size() < 30 &&
+             data.date is string && data.date.size() == 10 &&
+             data.timeSlot is string && data.timeSlot.size() <= 10 &&
+             data.serviceType is string && data.serviceType.size() > 0 && data.serviceType.size() < 100 &&
+             data.status in ['pendente', 'confirmado', 'cancelado'] &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 1000)) &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() < 128)) &&
+             (!('createdAt' in data) || (data.createdAt is string || data.createdAt is timestamp));
+    }
+
+    function isValidBookingPublic(data) {
+      return data.keys().hasAll(['date', 'timeSlot', 'status']) &&
+             data.keys().size() == 3 &&
+             data.date is string && data.date.size() == 10 &&
+             data.timeSlot is string && data.timeSlot.size() <= 10 &&
+             data.status in ['pendente', 'confirmado', 'cancelado'];
+    }
+
+    function isValidClientProject(data) {
+      return data.keys().hasAll(['title', 'description', 'clientEmail', 'clientName', 'status', 'progress', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             data.clientEmail is string && data.clientEmail.size() < 256 && data.clientEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.status in ['planeamento', 'producao', 'gravacao', 'edicao', 'revisao', 'concluido'] &&
+             data.progress is number && data.progress >= 0 && data.progress <= 100 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000)) &&
+             (!('previewUrl' in data) || (data.previewUrl is string && data.previewUrl.size() < 1000)) &&
+             (!('deliveryUrl' in data) || (data.deliveryUrl is string && data.deliveryUrl.size() < 1000)) &&
+             (data.createdAt is string || data.createdAt is timestamp) &&
+             (data.updatedAt is string || data.updatedAt is timestamp);
+     }
+
+    function isValidNewsletterSubscriber(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             data.keys().size() == 2 &&
+             data.email is string && data.email.size() < 256 && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             (data.createdAt is string || data.createdAt is timestamp);
+    }
+
+    function isValidNewsPost(data) {
+      return data.keys().hasAll(['title', 'content', 'category', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 150 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000 &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (data.createdAt is string || data.createdAt is timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -155,6 +208,42 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin() && isValidSettings(request.resource.data);
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isValidBooking(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /bookings_public/{bookingId} {
+      allow read: if true;
+      allow create: if isValidBookingPublic(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /client_projects/{projectId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.clientEmail == request.auth.token.email);
+      allow create: if (isAdmin() && isValidClientProject(request.resource.data)) ||
+                    (isAuthenticated() && 
+                     request.auth.token.email == request.resource.data.clientEmail && 
+                     request.resource.data.status == 'planeamento' && 
+                     request.resource.data.progress == 0 && 
+                     isValidClientProject(request.resource.data));
+      allow update: if isAdmin() && isValidClientProject(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidNewsPost(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /newsletter_subscribers/{subscriberId} {
+      allow read: if isAdmin();
+      allow create: if isValidNewsletterSubscriber(request.resource.data);
+      allow update, delete: if isAdmin();
     }
 
     match /test/connection {

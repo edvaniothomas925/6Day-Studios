@@ -73,6 +73,77 @@
         "tiktok": { "type": "string" }
       },
       "required": ["whatsapp", "email"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Um agendamento de reunião de consultoria.",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "date": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "confirmado", "cancelado"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["clientName", "clientEmail", "clientPhone", "date", "timeSlot", "serviceType", "status"]
+    },
+    "BookingPublic": {
+      "title": "BookingPublic",
+      "description": "Registo público de horário de agendamento sem dados pessoais.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "confirmado", "cancelado"] }
+      },
+      "required": ["date", "timeSlot", "status"]
+    },
+    "ClientProject": {
+      "title": "ClientProject",
+      "description": "Acompanhamento de projeto de produção em andamento para clientes.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "clientName": { "type": "string" },
+        "status": { "type": "string", "enum": ["planeamento", "producao", "gravacao", "edicao", "revisao", "concluido"] },
+        "progress": { "type": "number" },
+        "notes": { "type": "string" },
+        "previewUrl": { "type": "string" },
+        "deliveryUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "description", "clientEmail", "clientName", "status", "progress", "createdAt", "updatedAt"]
+    },
+    "NewsletterSubscriber": {
+      "title": "NewsletterSubscriber",
+      "description": "Subscritor interessado em novidades e promoções.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "NewsPost": {
+      "title": "NewsPost",
+      "description": "Post de notícias ou novidades sobre as produções do estúdio.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "content", "category", "createdAt"]
     }
   },
   "firestore": {
@@ -95,6 +166,26 @@
     "/settings/{settingId}": {
       "schema": "Settings",
       "description": "Configurações globais (geralmente apenas um documento 'main')"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Agendamentos de reuniões e consultorias"
+    },
+    "/bookings_public/{bookingId}": {
+      "schema": "BookingPublic",
+      "description": "Lista pública e anônima de horários agendados"
+    },
+    "/client_projects/{projectId}": {
+      "schema": "ClientProject",
+      "description": "Acompanhamento de projetos em andamento para clientes"
+    },
+    "/newsletter_subscribers/{subscriberId}": {
+      "schema": "NewsletterSubscriber",
+      "description": "Inscritos na newsletter de novidades e promoções"
+    },
+    "/news/{newsId}": {
+      "schema": "NewsPost",
+      "description": "Lista de notícias, novidades e lançamentos do estúdio"
     }
   }
 }

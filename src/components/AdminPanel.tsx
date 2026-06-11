@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Plus, Trash2, Edit2, Save, Settings as SettingsIcon, Globe, Mail, Phone, MapPin as MapPinIcon, Headphones, ExternalLink, Layout, Edit, Music, Video, Image as ImageIcon } from 'lucide-react';
-import { collection, addDoc, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { X, Plus, Trash2, Edit2, Save, Settings as SettingsIcon, Globe, Mail, Phone, MapPin as MapPinIcon, Headphones, ExternalLink, Layout, Edit, Music, Video, Image as ImageIcon, Calendar, Clock, Check, AlertCircle, User, Loader2, Activity } from 'lucide-react';
+import { collection, addDoc, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { cn, getDirectLink, getYoutubeThumbnail, getYoutubeThumbnailFallback, isValidMediaUrl } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -10,7 +10,23 @@ import { useApp } from '../context/AppContext';
 
 const AdminPanel = () => {
   const { projects, services, products, settings, setIsAdminOpen } = useApp();
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'services' | 'products' | 'settings'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'services' | 'products' | 'settings' | 'bookings' | 'client_projects' | 'news'>('portfolio');
+
+  // Bookings state
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState<boolean>(true);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [editingBooking, setEditingBooking] = useState<any | null>(null);
+
+  // Client Projects state
+  const [clientProjects, setClientProjects] = useState<any[]>([]);
+  const [clientProjectsLoading, setClientProjectsLoading] = useState<boolean>(true);
+  const [editingClientProject, setEditingClientProject] = useState<any | null>(null);
+
+  // News posts state
+  const [newsPosts, setNewsPosts] = useState<any[]>([]);
+  const [newsPostsLoading, setNewsPostsLoading] = useState<boolean>(true);
+  const [editingNewsPost, setEditingNewsPost] = useState<any | null>(null);
 
   // Pagination states
   const [portfolioPage, setPortfolioPage] = useState(1);
@@ -23,7 +39,7 @@ const AdminPanel = () => {
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingSettings, setEditingSettings] = useState<Settings>(settings);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'project' | 'service' | 'product', title: string } | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'project' | 'service' | 'product' | 'client_project' | 'news', title: string } | null>(null);
 
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,14 +102,60 @@ const AdminPanel = () => {
       } else if (itemToDelete.type === 'service') {
         await deleteDoc(doc(db, 'services', itemToDelete.id));
         toast.success('Serviço excluído.');
+      } else if (itemToDelete.type === 'client_project') {
+        await deleteDoc(doc(db, 'client_projects', itemToDelete.id));
+        toast.success('Canal de acompanhamento de projeto excluído.');
+      } else if (itemToDelete.type === 'news') {
+        await deleteDoc(doc(db, 'news', itemToDelete.id));
+        toast.success('Publicação de novidade excluída.');
       } else {
         await deleteDoc(doc(db, 'products', itemToDelete.id));
         toast.success('Produto excluído.');
       }
       setItemToDelete(null);
     } catch (error) {
-      toast.error(`Erro ao excluir ${itemToDelete.type === 'project' ? 'projeto' : itemToDelete.type === 'service' ? 'serviço' : 'produto'}.`);
-      handleFirestoreError(error, OperationType.DELETE, itemToDelete.type === 'project' ? 'projects' : itemToDelete.type === 'service' ? 'services' : 'products');
+      toast.error(`Erro ao sintonizar exclusão.`);
+      const collectionName = itemToDelete.type === 'client_project' ? 'client_projects' : 
+                             itemToDelete.type === 'project' ? 'projects' : 
+                             itemToDelete.type === 'service' ? 'services' : 
+                             itemToDelete.type === 'news' ? 'news' : 'products';
+      handleFirestoreError(error, OperationType.DELETE, collectionName);
+    }
+  };
+
+  const handleSaveClientProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClientProject) return;
+
+    try {
+      const now = new Date().toISOString();
+      const payload = {
+        title: editingClientProject.title,
+        description: editingClientProject.description,
+        clientEmail: editingClientProject.clientEmail.trim(),
+        clientName: editingClientProject.clientName,
+        status: editingClientProject.status || 'planeamento',
+        progress: Number(editingClientProject.progress || 0),
+        notes: editingClientProject.notes || '',
+        previewUrl: editingClientProject.previewUrl || '',
+        deliveryUrl: editingClientProject.deliveryUrl || '',
+        updatedAt: now
+      };
+
+      if (editingClientProject.id) {
+        await updateDoc(doc(db, 'client_projects', editingClientProject.id), payload);
+        toast.success('Acompanhamento de projeto atualizado!');
+      } else {
+        await addDoc(collection(db, 'client_projects'), {
+          ...payload,
+          createdAt: now
+        });
+        toast.success('Novo acompanhamento criado com sucesso!');
+      }
+      setEditingClientProject(null);
+    } catch (error) {
+      toast.error('Erro ao salvar canal de acompanhamento.');
+      handleFirestoreError(error, OperationType.WRITE, 'client_projects');
     }
   };
 
@@ -171,6 +233,155 @@ const AdminPanel = () => {
     } catch (error) {
       toast.error('Erro ao salvar configurações.');
       handleFirestoreError(error, OperationType.WRITE, 'settings');
+    }
+  };
+
+  // Bookings Listener (Realtime)
+  useEffect(() => {
+    const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setBookings(items);
+      setBookingsLoading(false);
+    }, (error) => {
+      console.error("Erro ao escutar agendamentos:", error);
+      setBookingsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Client Projects Listener (Realtime)
+  useEffect(() => {
+    const q = query(collection(db, 'client_projects'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setClientProjects(items);
+      setClientProjectsLoading(false);
+    }, (error) => {
+      console.error("Erro ao escutar projetos:", error);
+      setClientProjectsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // News Posts Listener (Realtime)
+  useEffect(() => {
+    const q = query(collection(db, 'news'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setNewsPosts(items);
+      setNewsPostsLoading(false);
+    }, (error) => {
+      console.error("Erro ao escutar novidades:", error);
+      setNewsPostsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSaveNewsPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNewsPost) return;
+
+    try {
+      const { id, ...data } = editingNewsPost;
+      if (id) {
+        await updateDoc(doc(db, 'news', id), {
+          ...data,
+          createdAt: data.createdAt || new Date().toISOString()
+        });
+        toast.success('Notícia atualizada com sucesso!');
+      } else {
+        await addDoc(collection(db, 'news'), {
+          ...data,
+          createdAt: new Date().toISOString()
+        });
+        toast.success('Nova notícia publicada!');
+      }
+      setEditingNewsPost(null);
+    } catch (error) {
+      toast.error('Erro ao salvar notícia.');
+      handleFirestoreError(error, OperationType.WRITE, 'news');
+    }
+  };
+
+  const handleDeleteNewsPost = async (id: string) => {
+    const post = newsPosts.find(p => p.id === id);
+    if (post) {
+      setItemToDelete({ id, type: 'news', title: post.title });
+    }
+  };
+
+  const handleUpdateBookingStatus = async (bookingId: string, newStatus: 'pendente' | 'confirmado' | 'cancelado') => {
+    try {
+      await updateDoc(doc(db, 'bookings', bookingId), { status: newStatus });
+      
+      const booking = bookings.find(b => b.id === bookingId);
+      if (booking) {
+        await setDoc(doc(db, 'bookings_public', bookingId), {
+          date: booking.date,
+          timeSlot: booking.timeSlot,
+          status: newStatus
+        });
+      }
+      
+      toast.success(`Agendamento marcado como ${newStatus}!`);
+    } catch (error) {
+      toast.error('Erro ao atualizar status do agendamento.');
+      handleFirestoreError(error, OperationType.WRITE, `bookings/${bookingId}`);
+    }
+  };
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!window.confirm('Excluir este agendamento permanentemente?')) return;
+    try {
+      await deleteDoc(doc(db, 'bookings', bookingId));
+      try {
+        await deleteDoc(doc(db, 'bookings_public', bookingId));
+      } catch (err) {
+        console.warn("Public booking slot was already deleted or didn't exist:", err);
+      }
+      toast.success('Agendamento excluído!');
+    } catch (error) {
+      toast.error('Erro ao excluir agendamento.');
+      handleFirestoreError(error, OperationType.DELETE, `bookings/${bookingId}`);
+    }
+  };
+
+  const handleSaveBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBooking) return;
+
+    try {
+      const { id, ...data } = editingBooking;
+      await updateDoc(doc(db, 'bookings', id), {
+        ...data,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Keep bookings_public slot in sync too
+      await setDoc(doc(db, 'bookings_public', id), {
+        date: data.date,
+        timeSlot: data.timeSlot,
+        status: data.status
+      });
+
+      toast.success('Agendamento atualizado com sucesso!');
+      setEditingBooking(null);
+    } catch (error) {
+      toast.error('Erro ao editar agendamento.');
+      handleFirestoreError(error, OperationType.WRITE, `bookings/${editingBooking.id}`);
     }
   };
 
@@ -252,6 +463,33 @@ const AdminPanel = () => {
           )}
         >
           Produtos
+        </button>
+        <button 
+          onClick={() => setActiveTab('bookings')}
+          className={cn(
+            "px-6 md:px-8 py-3 md:py-4 text-xs md:text-sm font-bold transition-all border-b-2 whitespace-nowrap",
+            activeTab === 'bookings' ? "border-gold text-gold" : "border-transparent text-white/40 hover:text-white"
+          )}
+        >
+          Agendamentos
+        </button>
+        <button 
+          onClick={() => setActiveTab('client_projects')}
+          className={cn(
+            "px-6 md:px-8 py-3 md:py-4 text-xs md:text-sm font-bold transition-all border-b-2 whitespace-nowrap",
+            activeTab === 'client_projects' ? "border-gold text-gold" : "border-transparent text-white/40 hover:text-white"
+          )}
+        >
+          Acomp. Projetos
+        </button>
+        <button 
+          onClick={() => setActiveTab('news')}
+          className={cn(
+            "px-6 md:px-8 py-3 md:py-4 text-xs md:text-sm font-bold transition-all border-b-2 whitespace-nowrap",
+            activeTab === 'news' ? "border-gold text-gold" : "border-transparent text-white/40 hover:text-white"
+          )}
+        >
+          Novidades Prod
         </button>
         <button 
           onClick={() => setActiveTab('settings')}
@@ -480,6 +718,250 @@ const AdminPanel = () => {
             </div>
           )}
 
+          {activeTab === 'bookings' && (
+            <div className="space-y-6 md:space-y-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-bold">Gestão de Consultorias</h3>
+                  <p className="text-xs md:text-sm text-white/50">Visualize, confirme e organize as reuniões solicitadas pelos clientes.</p>
+                </div>
+                {/* Stats row inside tab */}
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-medium">
+                    Total: <strong className="text-gold">{bookings.length}</strong>
+                  </span>
+                  <span className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 font-medium">
+                    Confirmados: <strong className="text-green-300">{bookings.filter(b => b.status === 'confirmado').length}</strong>
+                  </span>
+                  <span className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-400 font-medium">
+                    Pendentes: <strong className="text-yellow-300">{bookings.filter(b => b.status === 'pendente').length}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {bookingsLoading ? (
+                <div className="flex flex-col items-center justify-center p-20 select-none">
+                  <div className="w-12 h-12 rounded-full border-4 border-t-gold border-white/5 animate-spin mb-4" />
+                  <p className="text-xs text-white/40 uppercase tracking-widest font-black">Carregando agendamentos...</p>
+                </div>
+              ) : bookings.length === 0 ? (
+                <div className="glass-card p-12 text-center rounded-2xl flex flex-col items-center justify-center gap-4">
+                  <Calendar className="w-12 h-12 text-white/20" />
+                  <div>
+                    <h4 className="font-bold text-white text-lg">Nenhum agendamento encontrado</h4>
+                    <p className="text-white/40 text-xs mt-1">Os agendamentos efetuados pelos clientes aparecerão em tempo real aqui.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bookings.map((booking) => {
+                    const statusColors = {
+                      pendente: "bg-yellow-500/10 border-yellow-500/20 text-yellow-400",
+                      confirmado: "bg-green-500/10 border-green-500/20 text-green-400",
+                      cancelado: "bg-red-500/10 border-red-500/20 text-red-400"
+                    };
+
+                    const cleanPhone = booking.clientPhone.replace(/[^0-9+]/g, '');
+                    const waMessage = `Olá ${booking.clientName}! Verifiquei a sua reserva para a reunião de consultoria sobre "${booking.serviceType}" no dia ${booking.date} às ${booking.timeSlot}h. Vamos confirmar?`;
+                    const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMessage)}`;
+
+                    return (
+                      <div 
+                        key={booking.id} 
+                        className={cn(
+                          "glass-card p-5 md:p-6 rounded-2xl border transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6",
+                          booking.status === 'confirmado' ? 'border-green-500/20 bg-green-500/[0.01]' : 
+                          booking.status === 'cancelado' ? 'border-red-500/10 opacity-60' : 'border-white/10'
+                        )}
+                      >
+                        {/* Session Date and Subject Info */}
+                        <div className="space-y-4 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white font-bold font-mono">
+                              <Calendar className="w-3.5 h-3.5 text-gold" /> {booking.date} 
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white font-bold font-mono">
+                              <Clock className="w-3.5 h-3.5 text-gold" /> {booking.timeSlot}h
+                            </span>
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                              statusColors[booking.status as 'pendente' | 'confirmado' | 'cancelado'] || 'bg-white/5 text-white/50 border-white/5'
+                            )}>
+                              {booking.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                              {booking.serviceType}
+                              {booking.userId && (
+                                <span className="text-[9px] bg-gold/10 text-gold border border-gold/20 px-1.5 rounded-md uppercase tracking-widest font-black">Cliente Logado</span>
+                              )}
+                            </h4>
+                            {booking.notes && (
+                              <p className="p-3 bg-white/5 border border-white/5 rounded-xl text-white/60 text-xs font-light max-w-xl italic">
+                                "{booking.notes}"
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Client Contacts */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-white/40 pt-2 border-t border-white/5">
+                            <div className="flex items-center gap-2">
+                              <User className="w-3.5 h-3.5 text-gold" /> 
+                              <span className="text-white hover:underline cursor-pointer font-medium">{booking.clientName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 truncate">
+                              <Mail className="w-3.5 h-3.5 text-gold" />
+                              <a href={`mailto:${booking.clientEmail}`} className="hover:underline hover:text-white truncate">{booking.clientEmail}</a>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-3.5 h-3.5 text-gold" />
+                              <a href={`tel:${booking.clientPhone}`} className="hover:underline hover:text-white font-mono">{booking.clientPhone}</a>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Change & Social Actions Panel */}
+                        <div className="flex flex-wrap lg:flex-col gap-2 shrink-0 justify-end">
+                          <div className="flex gap-1.5 w-full">
+                            <button
+                              onClick={() => handleUpdateBookingStatus(booking.id, 'confirmado')}
+                              disabled={booking.status === 'confirmado'}
+                              className="flex-1 lg:flex-initial px-3 py-2 bg-green-500/20 hover:bg-green-500 text-green-300 hover:text-black font-bold text-xs rounded-xl border border-green-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-35 disabled:bg-green-500/5 disabled:text-green-500/40"
+                              title="Marcar como Confirmado"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Confirmar
+                            </button>
+                            <button
+                              onClick={() => handleUpdateBookingStatus(booking.id, 'cancelado')}
+                              disabled={booking.status === 'cancelado'}
+                              className="flex-1 lg:flex-initial px-3 py-2 bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white font-bold text-xs rounded-xl border border-red-500/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-35 disabled:bg-red-500/5 disabled:text-red-500/40"
+                              title="Marcar como Cancelado"
+                            >
+                              <X className="w-3.5 h-3.5" /> Cancelar
+                            </button>
+                          </div>
+                          <div className="flex gap-1.5 w-full">
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 px-3 py-2 bg-white/5 text-white hover:bg-gold hover:text-black border border-white/10 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Phone className="w-3.5 h-3.5 text-green-400 stroke-[2.5]" /> WhatsApp
+                            </a>
+                            <button
+                              onClick={() => setEditingBooking(booking)}
+                              className="px-3 py-2 bg-white/5 hover:bg-gold text-white/55 hover:text-black border border-white/10 rounded-xl transition-colors cursor-pointer flex items-center justify-center font-bold text-xs"
+                              title="Editar Detalhes"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBooking(booking.id)}
+                              className="px-3 py-2 bg-white/5 hover:bg-red-500 text-white/55 hover:text-white border border-white/10 rounded-xl transition-colors cursor-pointer flex items-center justify-center animate-none"
+                              title="Deletar Permanente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'news' && (
+            <div className="space-y-6 md:space-y-8 text-left">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-bold">Mural de Novidades da Prod</h3>
+                  <p className="text-xs text-white/40 mt-1">Publique notícias, novos lançamentos e avisos de promoções para todo o estúdio</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingNewsPost({ title: '', content: '', category: 'Novidades', imageUrl: '' })}
+                  className="px-5 py-3 bg-gold hover:bg-white text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" /> Nova Publicação
+                </button>
+              </div>
+
+              {newsPostsLoading ? (
+                <div className="min-h-[200px] flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-gold" />
+                </div>
+              ) : newsPosts.length === 0 ? (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center max-w-lg mx-auto">
+                  <span className="text-4xl block mb-4">📭</span>
+                  <h4 className="font-bold text-white text-lg">Sem publicações registadas</h4>
+                  <p className="text-sm text-white/35 mt-1 mb-6">Comece agora a abastecer o mural público com as ações da produtora.</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingNewsPost({ title: '', content: '', category: 'Novidades', imageUrl: '' })}
+                    className="px-4 py-2 border border-white/15 hover:border-white/35 text-white/70 hover:text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-colors cursor-pointer"
+                  >
+                    Adicionar Primeiro Post
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {newsPosts.map((post) => (
+                    <div key={post.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between transition-all hover:bg-white/[0.08]">
+                      <div className="flex items-start md:items-center gap-4 min-w-0">
+                        {post.imageUrl ? (
+                          <img 
+                            src={post.imageUrl} 
+                            alt="" 
+                            referrerPolicy="no-referrer"
+                            className="w-16 h-16 object-cover rounded-xl border border-white/10 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center flex-shrink-0 text-white/20">
+                            <span className="text-xs">Mural</span>
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-2 py-0.5 rounded-full bg-gold/15 text-gold text-[9px] uppercase font-black tracking-wider border border-gold/10">
+                              {post.category}
+                            </span>
+                            <span className="text-[10px] text-white/35 font-semibold font-mono">
+                              {post.createdAt ? new Date(post.createdAt).toLocaleDateString('pt-PT') : ''}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-white text-sm md:text-base truncate max-w-md">{post.title}</h4>
+                          <p className="text-xs text-white/40 truncate max-w-xs md:max-w-md mt-0.5">{post.content}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 w-full md:w-auto self-end md:self-auto justify-end border-t border-white/5 md:border-t-0 pt-3 md:pt-0">
+                        <button
+                          type="button"
+                          onClick={() => setEditingNewsPost(post)}
+                          className="px-3 py-2 bg-white/5 hover:bg-gold hover:text-black rounded-lg transition-all text-xs font-bold"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteNewsPost(post.id)}
+                          className="px-3 py-2 bg-white/5 hover:bg-red-500 rounded-lg transition-all text-xs font-bold"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'settings' && (
             <div className="space-y-6 md:space-y-8">
               <h3 className="text-xl md:text-2xl font-bold">Configurações Gerais</h3>
@@ -697,6 +1179,94 @@ const AdminPanel = () => {
               </div>
             </div>
           )}
+
+          {activeTab === 'client_projects' && (
+            <div className="space-y-6 md:space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <h3 className="text-xl md:text-2xl font-bold">Acompanhamento de Projetos</h3>
+                <button 
+                  onClick={() => setEditingClientProject({
+                    title: '',
+                    description: '',
+                    clientEmail: '',
+                    clientName: '',
+                    status: 'planeamento',
+                    progress: 0,
+                    notes: '',
+                    previewUrl: '',
+                    deliveryUrl: ''
+                  })}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-gold text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:scale-105 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Novo Painel de Cliente
+                </button>
+              </div>
+
+              {clientProjectsLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-4 text-white/45">
+                  <Loader2 className="w-8 h-8 animate-spin text-gold" />
+                  <p className="text-xs font-mono uppercase tracking-widest">A carregar painéis...</p>
+                </div>
+              ) : clientProjects.length === 0 ? (
+                <div className="p-12 text-center bg-white/5 border border-white/10 rounded-2xl">
+                  <Activity className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <p className="font-bold text-base text-white/80">Nenhum canal de acompanhamento registado</p>
+                  <p className="text-xs text-white/40 mt-1 max-w-sm mx-auto leading-relaxed">
+                    Crie um canal de monitorização inserindo o e-mail do cliente para que este possa visualizar o progresso do projeto em tempo real.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                  <div className="p-4 md:p-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <span className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                      Total: <strong className="text-gold">{clientProjects.length}</strong> painéis ativos
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-white/10">
+                    {clientProjects.map((proj) => (
+                      <div key={proj.id} className="p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-white/[0.02] transition-colors">
+                        <div className="space-y-1.5 flex-1 min-w-0 pr-4">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <h4 className="text-base md:text-lg font-bold truncate text-white">{proj.title}</h4>
+                            <span className="px-2.5 py-0.5 bg-gold/10 border border-gold/20 text-gold rounded text-[10px] font-black uppercase tracking-wider">
+                              {proj.status}
+                            </span>
+                            <span className="text-xs font-mono text-gold font-bold">
+                              {proj.progress}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-white/60 line-clamp-1">{proj.description}</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/40 font-semibold uppercase tracking-wider mt-1">
+                            <span>Cliente: <strong className="text-white/60 font-medium">{proj.clientName} ({proj.clientEmail})</strong></span>
+                            <span>•</span>
+                            <span>Atualizado: {new Date(proj.updatedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setEditingClientProject(proj)}
+                            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-white transition-all hover:scale-105"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setItemToDelete({ id: proj.id, type: 'client_project', title: proj.title })}
+                            className="p-2.5 bg-red-500/10 hover:bg-red-500 hover:text-white border border-red-500/20 text-red-500 rounded-xl transition-all hover:scale-105"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -732,10 +1302,10 @@ const AdminPanel = () => {
                     <select 
                       value={editingProject.type || 'video'}
                       onChange={e => setEditingProject({...editingProject, type: e.target.value as any})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      className="w-full bg-[#121214] border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white cursor-pointer [&_option]:bg-[#121214] [&_option]:text-white"
                     >
-                      <option value="video">Vídeo</option>
-                      <option value="audio">Áudio</option>
+                      <option value="video" className="bg-[#121214] text-white">Vídeo</option>
+                      <option value="audio" className="bg-[#121214] text-white">Áudio</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -859,10 +1429,10 @@ const AdminPanel = () => {
                       required
                       value={editingService.type || 'video'}
                       onChange={e => setEditingService({...editingService, type: e.target.value as any})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      className="w-full bg-[#121214] border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white cursor-pointer [&_option]:bg-[#121214] [&_option]:text-white"
                     >
-                      <option value="video">Vídeo</option>
-                      <option value="audio">Áudio</option>
+                      <option value="video" className="bg-[#121214] text-white">Vídeo</option>
+                      <option value="audio" className="bg-[#121214] text-white">Áudio</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -983,10 +1553,10 @@ const AdminPanel = () => {
                     <select 
                       value={editingProduct.type || 'digital'}
                       onChange={e => setEditingProduct({...editingProduct, type: e.target.value as any})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      className="w-full bg-[#121214] border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white cursor-pointer [&_option]:bg-[#121214] [&_option]:text-white"
                     >
-                      <option value="digital">Digital (Download / Envio Online)</option>
-                      <option value="physical">Físico (Entrega Física)</option>
+                      <option value="digital" className="bg-[#121214] text-white">Digital (Download / Envio Online)</option>
+                      <option value="physical" className="bg-[#121214] text-white">Físico (Entrega Física)</option>
                     </select>
                   </div>
 
@@ -1045,6 +1615,357 @@ const AdminPanel = () => {
                     className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-105 transition-transform"
                   >
                     Salvar Produto
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingClientProject && (
+          <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              className="bg-premium-gray border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-5 md:p-8"
+            >
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h3 className="text-xl md:text-2xl font-bold">{editingClientProject.id ? 'Editar Painel de Cliente' : 'Novo Painel de Cliente'}</h3>
+                <button onClick={() => setEditingClientProject(null)} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
+              </div>
+
+              <form onSubmit={handleSaveClientProject} className="space-y-5 md:space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Título do Projeto</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={editingClientProject.title || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, title: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: Gravação de Videoclipe - Banda Sol"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Nome do Cliente</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={editingClientProject.clientName || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, clientName: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: Carlos Silva"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">E-mail do Cliente</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={editingClientProject.clientEmail || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, clientEmail: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Ex: carlossilva@gmail.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Progresso Geral (%)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      required
+                      value={editingClientProject.progress ?? 0}
+                      onChange={e => setEditingClientProject({...editingClientProject, progress: Math.min(100, Math.max(0, Number(e.target.value)))})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Progresso / Status</label>
+                    <select 
+                      value={editingClientProject.status || 'planeamento'}
+                      onChange={e => setEditingClientProject({...editingClientProject, status: e.target.value as any})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold text-white outline-none h-12"
+                    >
+                      <option value="planeamento" className="bg-[#0A0A0A]">Planeamento & Guião</option>
+                      <option value="producao" className="bg-[#0A0A0A]">Pré-Produção & Recursos</option>
+                      <option value="gravacao" className="bg-[#0A0A0A]">Captação & Gravação</option>
+                      <option value="edicao" className="bg-[#0A0A0A]">Edição & Mistura</option>
+                      <option value="revisao" className="bg-[#0A0A0A]">Fase de Revisão (Draft ativo)</option>
+                      <option value="concluido" className="bg-[#0A0A0A]">Concluido (Links finais)</option>
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Link de Visualização (Draft / Preview)</label>
+                    <input 
+                      type="url" 
+                      value={editingClientProject.previewUrl || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, previewUrl: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Link Google Drive / Youtube de rascunhos"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Link Final de Entrega (Download Master)</label>
+                    <input 
+                      type="url" 
+                      value={editingClientProject.deliveryUrl || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, deliveryUrl: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all"
+                      placeholder="Link WeTransfer ou Google Drive definitivo"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Nota de Atualização do Produtor</label>
+                    <textarea 
+                      value={editingClientProject.notes || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, notes: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all h-24 resize-none"
+                      placeholder="Ex: Sincronização de áudio feita. Começamos a mistura das vozes amanhã!"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Descrição Detalhada do Escopo</label>
+                    <textarea 
+                      required
+                      value={editingClientProject.description || ''}
+                      onChange={e => setEditingClientProject({...editingClientProject, description: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all h-28 resize-none"
+                      placeholder="Ex: Produção de jingle comercial com spot de 30 segundos mais voz profissional off."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingClientProject(null)}
+                    className="flex-1 py-4 bg-white/5 rounded-xl font-bold hover:bg-white/10 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-105 transition-transform"
+                  >
+                    Salvar Painel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {editingBooking && (
+          <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              className="bg-premium-gray border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-5 md:p-8"
+            >
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h3 className="text-xl md:text-2xl font-bold">Gerir Detalhes do Agendamento</h3>
+                <button onClick={() => setEditingBooking(null)} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 md:w-6 md:h-6" /></button>
+              </div>
+
+              <form onSubmit={handleSaveBooking} className="space-y-5 md:space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Nome do Cliente</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingBooking.clientName || ''}
+                      onChange={e => setEditingBooking({...editingBooking, clientName: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 font-mono">Telefone</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingBooking.clientPhone || ''}
+                      onChange={e => setEditingBooking({...editingBooking, clientPhone: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all font-mono text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">E-mail</label>
+                    <input 
+                      required
+                      type="email" 
+                      value={editingBooking.clientEmail || ''}
+                      onChange={e => setEditingBooking({...editingBooking, clientEmail: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Serviço/Assunto</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingBooking.serviceType || ''}
+                      onChange={e => setEditingBooking({...editingBooking, serviceType: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 font-mono">Data</label>
+                    <input 
+                      required
+                      type="text" 
+                      placeholder="AAAA-MM-DD"
+                      value={editingBooking.date || ''}
+                      onChange={e => setEditingBooking({...editingBooking, date: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all font-mono text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 font-mono">Horário Slot</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={editingBooking.timeSlot || ''}
+                      onChange={e => setEditingBooking({...editingBooking, timeSlot: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all font-mono text-white"
+                      placeholder="Ex: 14:00"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Status do Agendamento</label>
+                    <select 
+                      value={editingBooking.status || 'pendente'}
+                      onChange={e => setEditingBooking({...editingBooking, status: e.target.value})}
+                      className="w-full bg-premium-gray border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white cursor-pointer [&_option]:bg-premium-gray"
+                    >
+                      <option value="pendente">pendente</option>
+                      <option value="confirmado">confirmado</option>
+                      <option value="cancelado">cancelado</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Notas / Briefing do agendamento</label>
+                    <textarea 
+                      value={editingBooking.notes || ''}
+                      onChange={e => setEditingBooking({...editingBooking, notes: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all h-24 resize-none text-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingBooking(null)}
+                    className="flex-1 py-4 bg-white/5 rounded-xl font-bold hover:bg-white/10 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-105 transition-transform"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {editingNewsPost && (
+          <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4">
+            <motion.div 
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              className="bg-premium-gray border-t md:border border-white/10 rounded-t-2xl md:rounded-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-5 md:p-8 text-left"
+            >
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h3 className="text-xl md:text-2xl font-bold">
+                  {editingNewsPost.id ? 'Editar Notícia / Lançamento' : 'Nova Publicação no Mural'}
+                </h3>
+                <button type="button" onClick={() => setEditingNewsPost(null)} className="p-2 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-colors cursor-pointer">
+                  <X className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveNewsPost} className="space-y-5 md:space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Título da Notícia</label>
+                    <input 
+                      required
+                      type="text" 
+                      placeholder="Ex: Novo single 'Coração Blindado' sai na próxima sexta-feira"
+                      value={editingNewsPost.title || ''}
+                      onChange={e => setEditingNewsPost({...editingNewsPost, title: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">Categoria</label>
+                      <select 
+                        value={editingNewsPost.category || 'Novidades'}
+                        onChange={e => setEditingNewsPost({...editingNewsPost, category: e.target.value})}
+                        className="w-full bg-premium-gray border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white cursor-pointer [&_option]:bg-premium-gray"
+                      >
+                        <option value="Lançamento">Lançamento</option>
+                        <option value="Estúdio">Estúdio</option>
+                        <option value="Promoção">Promoção</option>
+                        <option value="Novidades">Novidades</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-white/40">URL da Imagem Capa (Opcional)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ex: https://images.unsplash.com/..."
+                        value={editingNewsPost.imageUrl || ''}
+                        onChange={e => setEditingNewsPost({...editingNewsPost, imageUrl: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all text-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-white/40">Conteúdo do Post (Suporta quebras de linha)</label>
+                    <textarea 
+                      required
+                      placeholder="Escreva os detalhes da notícia, links importantes, descontos ou informações de bastidores..."
+                      value={editingNewsPost.content || ''}
+                      onChange={e => setEditingNewsPost({...editingNewsPost, content: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-all h-48 resize-none text-white text-sm leading-relaxed"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setEditingNewsPost(null)}
+                    className="flex-1 py-4 bg-white/5 rounded-xl font-bold hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-gold text-black rounded-xl font-bold hover:scale-[1.03] active:scale-95 transition-all cursor-pointer"
+                  >
+                    {editingNewsPost.id ? 'Salvar Edição' : 'Publicar no Mural'}
                   </button>
                 </div>
               </form>

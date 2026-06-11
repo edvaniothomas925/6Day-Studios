@@ -426,15 +426,18 @@ const Home = () => {
               Seja um videoclipe, um comercial ou uma produção musical, estamos prontos para superar suas expectativas.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+              <Link 
+                to="/agendar"
+                className="w-full sm:w-auto px-12 py-6 bg-gold text-black font-black text-xl uppercase tracking-widest rounded-full hover:scale-105 transition-transform shadow-[0_20px_50px_rgba(212,175,55,0.3)] text-center"
+              >
+                Agendar Reunião
+              </Link>
               <a 
                 href={getWhatsAppUrl(settings.whatsapp)}
-                className="w-full sm:w-auto px-12 py-6 bg-gold text-black font-black text-xl uppercase tracking-widest rounded-full hover:scale-105 transition-transform shadow-[0_20px_50px_rgba(212,175,55,0.3)]"
+                className="w-full sm:w-auto px-12 py-6 bg-white/5 border border-white/10 text-white font-black text-xl uppercase tracking-widest rounded-full hover:bg-white/10 transition-all text-center"
               >
                 Falar no WhatsApp
               </a>
-              <Link to="/portfolio" className="group flex items-center gap-3 text-white font-bold uppercase tracking-widest text-sm hover:text-gold transition-colors">
-                Ver Portfólio <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-              </Link>
             </div>
           </motion.div>
         </div>

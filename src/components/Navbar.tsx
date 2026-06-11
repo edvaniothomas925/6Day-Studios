@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X, LogIn, LogOut, User as UserIcon, Shield, Instagram, Facebook, Youtube, ArrowRight } from 'lucide-react';
+import { Menu, X, LogIn, LogOut, User as UserIcon, Shield, Instagram, Facebook, Youtube, ArrowRight, Bell, Smartphone, Clock } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn, getWhatsAppUrl } from '../lib/utils';
@@ -10,7 +10,22 @@ import { useApp } from '../context/AppContext';
 const Navbar = React.memo(() => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [logoError, setLogoError] = useState(false);
-  const { user, isAdmin, settings, setIsAdminOpen, isMobileMenuOpen, setIsMobileMenuOpen } = useApp();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const { 
+    user, 
+    isAdmin, 
+    settings, 
+    setIsAdminOpen, 
+    isMobileMenuOpen, 
+    setIsMobileMenuOpen,
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotifications,
+    showInstallButton,
+    triggerInstall
+  } = useApp();
   const location = useLocation();
 
   useEffect(() => {
@@ -23,15 +38,28 @@ const Navbar = React.memo(() => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = React.useMemo(() => [
-    { name: 'Home', href: '/' },
-    { name: 'Portfólio', href: '/portfolio' },
-    { name: 'Serviços', href: '/servicos' },
-    { name: 'Produtos', href: '/produtos' },
-    { name: 'Sobre', href: '/sobre' },
-  ], []);
+  const navLinks = React.useMemo(() => {
+    const list = [
+      { name: 'Home', href: '/' },
+      { name: 'Portfólio', href: '/portfolio' },
+      { name: 'Serviços', href: '/servicos' },
+      { name: 'Agendar', href: '/agendar' },
+      { name: 'Produtos', href: '/produtos' },
+      { name: 'Novidades', href: '/novidades' },
+    ];
+    if (user) {
+      list.push({ name: 'Acompanhar', href: '/acompanhar' });
+    }
+    list.push({ name: 'Sobre', href: '/sobre' });
+    return list;
+  }, [user]);
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path.includes('#')) {
+      return (location.pathname + location.hash) === path;
+    }
+    return location.pathname === path && !location.hash;
+  };
 
   const handleLogin = async () => {
     try {
@@ -83,8 +111,136 @@ const Navbar = React.memo(() => {
               </Link>
             ))}
             
+            {showInstallButton && (
+              <button 
+                onClick={triggerInstall}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-gold/10 hover:bg-gold hover:text-black text-gold hover:scale-105 border border-gold/20 hover:border-transparent rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+                title="Instalar Aplicativo (PWA)"
+              >
+                <Smartphone className="w-3.5 h-3.5" /> Instalar App
+              </button>
+            )}
+
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 relative">
+                {/* Notifications Bell */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className={cn(
+                      "p-2 bg-white/5 hover:bg-white/10 text-white rounded-full border border-white/10 transition-all relative",
+                      isNotificationsOpen && "text-gold border-gold/30 bg-white/10"
+                    )}
+                    title="Notificações"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {unreadNotificationsCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-red-650 text-white font-black text-[9px] rounded-full flex items-center justify-center animate-pulse">
+                        {unreadNotificationsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {isNotificationsOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 15 }}
+                          className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#0E0E0E] border border-white/10 rounded-2xl shadow-2xl z-50 p-4"
+                          style={{ top: '100%' }}
+                        >
+                          <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                            <div className="flex items-center gap-2">
+                              <Bell className="w-4 h-4 text-gold" />
+                              <span className="font-bold text-sm tracking-tight">Notificações</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {unreadNotificationsCount > 0 && (
+                                <button 
+                                  onClick={() => { markAllNotificationsAsRead(); toast.success('Todas marcadas como lidas'); }}
+                                  className="text-[10px] font-black uppercase text-gold hover:underline"
+                                >
+                                  Lidas
+                                </button>
+                              )}
+                              {notifications.length > 0 && (
+                                <button 
+                                  onClick={() => { clearNotifications(); toast.info('Histórico apagado.'); }}
+                                  className="text-[10px] font-black uppercase text-white/40 hover:text-white"
+                                >
+                                  Limpar Tudo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
+                            {notifications.length === 0 ? (
+                              <div className="py-8 text-center text-white/30 space-y-1">
+                                <p className="text-xs font-bold uppercase tracking-wider">Acompanhar Projeto</p>
+                                <p className="text-[10px] text-white/40 leading-relaxed">Você será alertado em tempo real aqui quando o status do seu projeto for atualizado.</p>
+                              </div>
+                            ) : (
+                              notifications.map((n) => (
+                                <div 
+                                  key={n.id} 
+                                  onClick={() => markNotificationAsRead(n.id)}
+                                  className={cn(
+                                    "p-3 rounded-xl border text-left hover:bg-white/[0.02] transition-colors relative cursor-pointer",
+                                    n.read ? "bg-white/[0.01] border-white/5" : "bg-gold/5 border-gold/20"
+                                  )}
+                                >
+                                  {!n.read && (
+                                    <div className="absolute top-3 right-3 w-1.5 h-1.5 rounded-full bg-gold" />
+                                  )}
+                                  
+                                  <h5 className="font-bold text-xs text-white max-w-[85%] truncate">{n.projectTitle}</h5>
+                                  
+                                  <p className="text-[11px] text-white/60 mt-1 leading-relaxed">
+                                    O progresso agora é de <strong className="text-white">{n.newProgress}%</strong>. 
+                                    {n.oldStatus !== n.newStatus && (
+                                      <span> Mudou de Status para <strong className="text-gold uppercase text-[9px] font-bold">{n.newStatus}</strong></span>
+                                    )}
+                                  </p>
+
+                                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.03] text-[9px] text-white/30 font-medium">
+                                    <span className="flex items-center gap-1 font-mono">
+                                      <Clock className="w-2.5 h-2.5" />
+                                      {new Date(n.timestamp).toLocaleDateString()}
+                                    </span>
+                                    
+                                    {!n.read && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); markNotificationAsRead(n.id); }}
+                                        className="text-[9px] text-gold font-bold hover:underline"
+                                      >
+                                        Marcar como lida
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          
+                          <div className="pt-3 border-t border-white/10 mt-3 text-center">
+                            <Link 
+                              to="/acompanhar" 
+                              onClick={() => setIsNotificationsOpen(false)}
+                              className="text-[10px] text-gold font-black uppercase tracking-widest hover:underline flex items-center justify-center gap-1.5"
+                            >
+                              Ver Painel de Acompanhamento <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 {isAdmin && (
                   <button 
                     onClick={() => setIsAdminOpen(true)}
@@ -93,6 +249,7 @@ const Navbar = React.memo(() => {
                     <Shield className="w-3 h-3" /> Painel Admin
                   </button>
                 )}
+                
                 <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
                   {user.photoURL ? (
                     <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full" />
@@ -222,18 +379,63 @@ const Navbar = React.memo(() => {
                         <div className="text-xs text-white/40 truncate max-w-[150px]">{user.email}</div>
                       </div>
                     </div>
+
+                    {/* Collapsible Mobile Notifications Accordion */}
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-2">
+                        <span className="text-xs font-black uppercase tracking-widest text-white/50 flex items-center gap-1.5">
+                          <Bell className="w-3.5 h-3.5 text-gold" /> Notificações ({unreadNotificationsCount})
+                        </span>
+                        {notifications.length > 0 && (
+                          <button 
+                            onClick={() => { clearNotifications(); toast.info('Histórico apagado.'); }}
+                            className="text-[10px] text-white/40 hover:text-white uppercase font-bold"
+                          >
+                            Apagar
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                        {notifications.length === 0 ? (
+                          <div className="text-center py-4 text-[10px] text-white/30 italic">
+                            Nenhuma notificação nova
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id}
+                              onClick={() => markNotificationAsRead(n.id)}
+                              className={cn(
+                                "p-2.5 rounded-xl border text-left text-xs relative transition-all cursor-pointer",
+                                n.read ? "bg-white/[0.01] border-white/5" : "bg-gold/10 border-gold/20"
+                              )}
+                            >
+                              {!n.read && (
+                                <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-gold" />
+                              )}
+                              <div className="font-bold tracking-tight text-white line-clamp-1">{n.projectTitle}</div>
+                              <div className="text-[10px] text-white/50 mt-0.5">
+                                Progresso: {n.newProgress}%. Fase: {n.newStatus}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       {isAdmin && (
                         <button 
                           onClick={() => { setIsAdminOpen(true); setIsMobileMenuOpen(false); }}
-                          className="py-3 bg-gold/10 text-gold text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 border border-gold/20"
+                          className="py-3 bg-gold/10 text-gold text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 border border-gold/20 cursor-pointer"
                         >
                           <Shield className="w-3 h-3" /> Admin
                         </button>
                       )}
                       <button 
                         onClick={() => { logout(); setIsMobileMenuOpen(false); }}
-                        className="py-3 bg-white/5 text-white/60 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 border border-white/5"
+                        className="py-3 bg-white/5 text-white/60 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 border border-white/5 cursor-pointer"
                       >
                         <LogOut className="w-3 h-3" /> Sair
                       </button>
@@ -245,7 +447,7 @@ const Navbar = React.memo(() => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
                     onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }}
-                    className="w-full py-5 bg-white/5 border border-white/10 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-3"
+                    className="w-full py-5 bg-white/5 border border-white/10 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-3 cursor-pointer"
                   >
                     <LogIn className="w-4 h-4" /> Fazer Login
                   </motion.button>
@@ -257,6 +459,15 @@ const Navbar = React.memo(() => {
                   transition={{ delay: 0.6 }}
                   className="space-y-4"
                 >
+                  {showInstallButton && (
+                    <button 
+                      onClick={() => { triggerInstall(); setIsMobileMenuOpen(false); }}
+                      className="w-full py-5 bg-gold/10 hover:bg-gold/20 text-gold text-center font-black text-xs uppercase tracking-[0.2em] rounded-2xl border border-gold/20 flex items-center justify-center gap-3 transition-all cursor-pointer"
+                    >
+                      <Smartphone className="w-4 h-4 animate-bounce" /> Instalar Aplicativo
+                    </button>
+                  )}
+
                   <a 
                     href={getWhatsAppUrl(settings.whatsapp)}
                     target="_blank"

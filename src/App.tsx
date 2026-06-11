@@ -11,7 +11,10 @@ import { Loader2 } from 'lucide-react';
 const Home = lazy(() => import('./pages/Home'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+const ProjectTrackingPage = lazy(() => import('./pages/ProjectTrackingPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
+const NewsPage = lazy(() => import('./pages/NewsPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
@@ -35,7 +38,10 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/servicos" element={<ServicesPage />} />
+              <Route path="/agendar" element={<BookingPage />} />
+              <Route path="/acompanhar" element={<ProjectTrackingPage />} />
               <Route path="/produtos" element={<ProductsPage />} />
+              <Route path="/novidades" element={<NewsPage />} />
               <Route path="/sobre" element={<AboutPage />} />
               <Route path="/privacidade" element={<PrivacyPage />} />
               <Route path="/termos" element={<TermsPage />} />

@@ -1,13 +1,21 @@
 import React from 'react';
-import { Instagram, Youtube, Globe, Shield, Lock, Facebook } from 'lucide-react';
+import { Instagram, Youtube, Globe, Shield, Lock, Facebook, Mail, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useApp } from '../context/AppContext';
-import { signInWithGoogle } from '../firebase';
+import { signInWithGoogle, db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const Footer = React.memo(() => {
   const { user, isAdmin, settings, setIsAdminOpen } = useApp();
   const [logoError, setLogoError] = React.useState(false);
+
+  // Newsletter State
+  const [email, setEmail] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [isSubscribed, setIsSubscribed] = React.useState(() => {
+    return localStorage.getItem('newsletter_subscribed') === 'true';
+  });
 
   React.useEffect(() => {
     setLogoError(false);
@@ -24,9 +32,103 @@ const Footer = React.memo(() => {
     }
   };
 
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      toast.error('Por favor, introduza um endereço de e-mail válido.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await addDoc(collection(db, 'newsletter_subscribers'), {
+        email: trimmedEmail,
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('newsletter_subscribed', 'true');
+      setIsSubscribed(true);
+      setEmail('');
+      toast.success('Inscrição confirmada!', {
+        description: 'Obrigado por se subscrever! Enviamos novidades em breve.',
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Newsletter subscription error:', error);
+      try {
+        handleFirestoreError(error, OperationType.CREATE, 'newsletter_subscribers');
+      } catch (err) {
+        toast.error('Erro ao subscrever a newsletter. Tente novamente.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <footer className="py-20 px-6 bg-premium-black border-t border-white/5">
+    <footer className="py-20 px-6 bg-premium-black border-t border-white/5" id="footer-section">
       <div className="max-w-7xl mx-auto">
+        {/* Newsletter Pitch & Lead Capture Row */}
+        <div className="pb-12 mb-12 border-b border-white/5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8" id="newsletter-container">
+          <div className="max-w-md">
+            <h3 className="text-lg font-bold tracking-tight text-white mb-2 flex items-center gap-2" id="newsletter-title">
+              <Mail className="w-4 h-4 text-gold animate-pulse" /> Subscreva a nossa Newsletter
+            </h3>
+            <p className="text-xs text-white/50 leading-relaxed" id="newsletter-description">
+              Seja o primeiro a receber novidades de áudio, lançamentos de produções de vídeo do estúdio, campanhas publicitárias e promoções exclusivas da 6Day Studios.
+            </p>
+          </div>
+
+          {isSubscribed ? (
+            <div className="flex items-center gap-3 bg-gold/5 border border-gold/15 p-4 rounded-xl max-w-sm w-full animate-fade-in" id="newsletter-success-box">
+              <CheckCircle2 className="w-5 h-5 text-gold flex-shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-white uppercase tracking-wider">Subscrição Ativa</p>
+                <p className="text-[10px] text-white/50 leading-relaxed">Você agora faz parte da nossa comunidade VIP. Fique atento à sua caixa de entrada!</p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubscribe} className="max-w-md w-full" id="newsletter-subscribe-form">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="relative flex-1">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Introduza o seu melhor e-mail"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                    className="w-full bg-white/5 hover:bg-white/[0.08] focus:bg-[#0E0E0E] text-white border border-white/10 focus:border-gold/50 rounded-xl px-4 py-3 text-xs focus:outline-none transition-all pl-10 h-11"
+                    id="newsletter-email-input"
+                  />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-gold hover:bg-gold-dark text-black font-black text-xs uppercase tracking-wider px-6 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed h-11"
+                  id="newsletter-submit-btn"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      Subscrever <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[10px] text-white/30 mt-2">
+                * Respeitamos a sua privacidade. Cancele a sua subscrição a qualquer momento.
+              </p>
+            </form>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
           <div className="col-span-1 md:col-span-2">
             <Link to="/" className="text-2xl font-bold tracking-tighter flex items-center gap-2 mb-6">

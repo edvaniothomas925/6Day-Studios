@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, doc, onSnapshot, setDoc, getDoc, addDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, getDoc, addDoc, where, query } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { Project, Service, Settings, AppContextType, Product } from '../types';
+import { Project, Service, Settings, AppContextType, Product, AppNotification, ClientProject } from '../types';
 import { PROJECTS, SERVICES, PRODUCTS } from '../constants';
+import { toast } from 'sonner';
 
 const DEFAULT_SETTINGS: Settings = {
   logoUrl: '/Logo.png',
@@ -29,6 +30,230 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Notifications State
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    const stored = localStorage.getItem('user_notifications');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('user_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(() => {
+    // Check if running in standalone mode or already marked as installed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    const isAlreadyInstalled = localStorage.getItem('pwa_installed') === 'true';
+    if (isStandalone || isAlreadyInstalled) {
+      return false;
+    }
+    return true; // Make it visible to anyone not already installed so they can trigger instructions/prompts!
+  });
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    const isAlreadyInstalled = localStorage.getItem('pwa_installed') === 'true';
+    
+    if (isStandalone || isAlreadyInstalled) {
+      setShowInstallButton(false);
+    }
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      if (isStandalone || isAlreadyInstalled) {
+        return;
+      }
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+
+    const handleAppInstalled = () => {
+      console.log('O aplicativo foi instalado com sucesso!');
+      localStorage.setItem('pwa_installed', 'true');
+      setShowInstallButton(false);
+      setDeferredPrompt(null);
+      toast.success("Instalação concluída com sucesso!", {
+        description: "Obrigado por instalar o aplicativo da 6Day Studios no seu dispositivo.",
+        duration: 8000,
+      });
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const triggerInstall = async () => {
+    // Check if inside Google AI Studio Preview Iframe
+    const isInIframe = window.self !== window.top;
+
+    if (isInIframe) {
+      toast.info("Aviso de Compatibilidade PWA", {
+        duration: 12000,
+        description: "Os navegadores bloqueiam instalações nativas dentro de painéis de pré-visualização (iframes). Clique no botão 'Abrir numa nova aba' no canto superior direito para poder instalar diretamente da barra de endereço!",
+        action: {
+          label: "Instruções",
+          onClick: () => {
+            alert(
+              "Para Instalar o Aplicativo (PWA):\n\n" +
+              "1. Abra a aplicação numa aba separada fora do painel de desenvolvimento.\n" +
+              "2. No Computador: Clique no ícone de instalação (computador com seta para baixo) na barra de endereço (URL) do seu navegador.\n" +
+              "3. No Celular (Android): Clique no banner de instalação ou escolha 'Adicionar ao ecrã principal' no menu do Chrome.\n" +
+              "4. No iOS (iPhone): Clique em 'Partilhar/Enviar' e selecione 'Adicionar ao ecrã inicial'."
+            );
+          }
+        }
+      });
+      return;
+    }
+
+    if (!deferredPrompt) {
+      toast.info("Suporte de Instalação", {
+        duration: 10000,
+        description: "Pode instalar diretamente escolhendo 'Adicionar ao ecrã principal' ou clicando no ícone de computador/instalação na barra de endereço do seu navegador.",
+        action: {
+          label: "Como instalar?",
+          onClick: () => {
+            alert(
+              "Como Instalar o 6Day Studios:\n\n" +
+              "- Google Chrome (Desktop): Clique no ícone de monitor na barra de URL (direita).\n" +
+              "- Android (Chrome): Clique nos três pontos (...) e depois em 'Adicionar ao ecrã principal' / 'Instalar aplicativo'.\n" +
+              "- iOS / iPhone (Safari): Toque no botão 'Partilhar' (seta apontando para cima) e selecione 'Adicionar ao ecrã principal'."
+            );
+          }
+        }
+      });
+      return;
+    }
+
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`PWA install option was: ${outcome}`);
+      if (outcome === 'accepted') {
+        localStorage.setItem('pwa_installed', 'true');
+        setShowInstallButton(false);
+        setDeferredPrompt(null);
+        toast.success("Instalação concluída com sucesso!", {
+          description: "Obrigado por instalar o aplicativo da 6Day Studios no seu dispositivo.",
+          duration: 8000,
+        });
+      }
+    } catch (err) {
+      console.error("Falha ao abrir prompt de instalação:", err);
+    }
+  };
+
+  // Real-time listener for client project status transitions
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const q = query(
+      collection(db, 'client_projects'),
+      where('clientEmail', '==', user.email)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const storedStatesStr = localStorage.getItem('last_project_states');
+      const storedStates = storedStatesStr ? JSON.parse(storedStatesStr) : {};
+      const newStates: Record<string, { status: string; progress: number; title: string }> = {};
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data() as ClientProject;
+        const projectId = doc.id;
+        const projectTitle = data.title || 'Projeto';
+        const currentStatus = data.status || 'planeamento';
+        const currentProgress = data.progress || 0;
+
+        newStates[projectId] = {
+          status: currentStatus,
+          progress: currentProgress,
+          title: projectTitle
+        };
+
+        const previous = storedStates[projectId];
+        if (previous) {
+          const statusChanged = previous.status !== currentStatus;
+          const progressChanged = previous.progress !== currentProgress;
+
+          if (statusChanged || progressChanged) {
+            // New transition detected
+            const timestamp = new Date().toISOString();
+            const STATUS_LABELS: Record<string, string> = {
+              planeamento: 'Planeamento & Guião',
+              producao: 'Pré-Produção & Recursos',
+              gravacao: 'Captação & Gravação',
+              edicao: 'Edição & Mistura',
+              revisao: 'Fase de Revisão (Draft)',
+              concluido: 'Concluido'
+            };
+
+            const newStatusLabel = STATUS_LABELS[currentStatus] || currentStatus;
+            let msg = '';
+            
+            if (statusChanged && progressChanged) {
+              msg = `O seu projeto "${projectTitle}" avançou para ${newStatusLabel} (${currentProgress}% progress).`;
+            } else if (statusChanged) {
+              msg = `O seu projeto "${projectTitle}" está agora na fase de: ${newStatusLabel}.`;
+            } else {
+              msg = `O progresso do seu projeto "${projectTitle}" subiu para ${currentProgress}%.`;
+            }
+
+            const newNotif: AppNotification = {
+              id: `${projectId}_${Date.now()}`,
+              projectId,
+              projectTitle,
+              oldStatus: previous.status,
+              newStatus: currentStatus,
+              oldProgress: previous.progress,
+              newProgress: currentProgress,
+              timestamp,
+              read: false
+            };
+
+            setNotifications(prev => [newNotif, ...prev]);
+
+            toast.success(msg, {
+              duration: 8000,
+              description: 'Consulte as atualizações na área "Acompanhar".',
+              action: {
+                label: 'Ver Painel',
+                onClick: () => {
+                  window.location.href = '/acompanhar';
+                }
+              }
+            });
+          }
+        }
+      });
+
+      // Update local storage reference index
+      localStorage.setItem('last_project_states', JSON.stringify(newStates));
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     // Auth Listener
@@ -161,8 +386,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isAdminOpen,
     isMobileMenuOpen,
     setIsAdminOpen: setIsAdminOpenCallback,
-    setIsMobileMenuOpen: setIsMobileMenuOpenCallback
-  }), [projects, services, products, settings, user, isAdmin, loading, isAdminOpen, isMobileMenuOpen, setIsAdminOpenCallback, setIsMobileMenuOpenCallback]);
+    setIsMobileMenuOpen: setIsMobileMenuOpenCallback,
+    // Notifications
+    notifications,
+    unreadNotificationsCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotifications,
+    // PWA
+    showInstallButton,
+    triggerInstall
+  }), [
+    projects, services, products, settings, user, isAdmin, loading, isAdminOpen, isMobileMenuOpen, 
+    setIsAdminOpenCallback, setIsMobileMenuOpenCallback,
+    notifications, unreadNotificationsCount, showInstallButton
+  ]);
 
   return (
     <AppContext.Provider value={contextValue}>

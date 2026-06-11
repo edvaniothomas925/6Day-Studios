@@ -7,7 +7,7 @@ import AdminPanel from './AdminPanel';
 import { useApp } from '../context/AppContext';
 
 const Layout = React.memo(({ children }: { children: React.ReactNode }) => {
-  const { isAdminOpen, loading } = useApp();
+  const { isAdminOpen, isAdmin, loading } = useApp();
 
   const loadingView = React.useMemo(() => (
     <div className="min-h-screen bg-premium-black flex items-center justify-center">
@@ -24,7 +24,7 @@ const Layout = React.memo(({ children }: { children: React.ReactNode }) => {
       <Navbar />
       
       <AnimatePresence>
-        {isAdminOpen && <AdminPanel />}
+        {(isAdminOpen && isAdmin) && <AdminPanel />}
       </AnimatePresence>
 
       <main>{children}</main>

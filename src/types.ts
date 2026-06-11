@@ -44,6 +44,33 @@ export interface Product {
   externalUrl?: string;
 }
 
+export interface ClientProject {
+  id: string;
+  title: string;
+  description: string;
+  clientEmail: string;
+  clientName: string;
+  status: 'planeamento' | 'producao' | 'gravacao' | 'edicao' | 'revisao' | 'concluido';
+  progress: number;
+  notes?: string;
+  previewUrl?: string;
+  deliveryUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  oldStatus?: string;
+  newStatus: string;
+  oldProgress?: number;
+  newProgress: number;
+  timestamp: string;
+  read: boolean;
+}
+
 export interface AppContextType {
   projects: Project[];
   services: Service[];
@@ -56,4 +83,13 @@ export interface AppContextType {
   loading: boolean;
   setIsAdminOpen: (open: boolean) => void;
   setIsMobileMenuOpen: (open: boolean) => void;
+  // Notifications
+  notifications: AppNotification[];
+  unreadNotificationsCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotifications: () => void;
+  // PWA triggers
+  showInstallButton: boolean;
+  triggerInstall: () => Promise<void>;
 }
