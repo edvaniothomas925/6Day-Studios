@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { getWhatsAppUrl } from '../lib/utils';
+import { FAQSection } from '../components/FAQSection';
 
 const Home = () => {
   const { settings, projects } = useApp();
@@ -377,6 +378,9 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* FAQ Section */}
+      <FAQSection />
 
       {/* Quick Access Section */}
       <section className="py-12 px-6 border-t border-white/5 bg-premium-black/30">
